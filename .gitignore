@@ -4,3 +4,5 @@
 *.sw[op]
 .DS_Store
 .vscode
+
+venv
