@@ -1,8 +1,8 @@
 # .gitignore
+private/
+venv/
 *~
 *.py[cod]
 *.sw[op]
 .DS_Store
 .vscode
-
-venv
