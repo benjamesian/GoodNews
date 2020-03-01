@@ -14,26 +14,28 @@ class Sentiment(models.Model):
     name = models.CharField(max_length=30, null=False, primary_key=True)
 
 
-def corpus(cls):
-    """Class decorator for representation of text with sentiment data"""
-    class Tag(models.Model):
-        """Intermediate model for relating corpora to sentiments"""
-        corpus = models.ForeignKey(cls, on_delete=models.CASCADE)
-        sentiment = models.ForeignKey(Sentiment, on_delete=models.CASCADE)
-        magnitude = models.FloatField()
-    setattr(cls, 'sentiments', models.ManyToManyField(Sentiment, through=Tag))
-    return cls
+class ArticleSentimentTag(models.Model):
+    """Intermediate model for relating corpora to sentiments"""
+    corpus = models.ForeignKey('Article', on_delete=models.CASCADE)
+    sentiment = models.ForeignKey(Sentiment, on_delete=models.CASCADE)
+    magnitude = models.FloatField()
 
 
-@corpus
 class Article(models.Model):
     """Representation of an article"""
     url = models.URLField(max_length=254)
     author = models.CharField(max_length=254)
     created_at = models.DateTimeField(default=None)
+    sentiments = models.ManyToManyField(Sentiment, through=ArticleSentimentTag)
 
 
-@corpus
+class CommentSentimentTag(models.Model):
+    """Intermediate model for relating corpora to sentiments"""
+    corpus = models.ForeignKey('Comment', on_delete=models.CASCADE)
+    sentiment = models.ForeignKey(Sentiment, on_delete=models.CASCADE)
+    magnitude = models.FloatField()
+
+
 class Comment(models.Model):
     """Representation of a comment"""
     content = models.CharField(max_length=510)
@@ -45,3 +47,4 @@ class Comment(models.Model):
         Article, models.SET_NULL, blank=True, null=True)
     parent = models.ForeignKey(
         'self', models.PROTECT, blank=True, null=True, related_name='replies')
+    sentiments = models.ManyToManyField(Sentiment, through=CommentSentimentTag)
