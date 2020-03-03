@@ -24,8 +24,10 @@ class ArticleSentimentTag(models.Model):
 class Article(models.Model):
     """Representation of an article"""
     url = models.URLField(max_length=254)
+    title = models.CharField(default='Article Title', max_length=254)
     author = models.CharField(max_length=254)
     created_at = models.DateTimeField(default=None)
+    picture = models.ImageField(null=True, upload_to='articles_images/', max_length=254)
     sentiments = models.ManyToManyField(Sentiment, through=ArticleSentimentTag)
 
 

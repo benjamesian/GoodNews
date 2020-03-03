@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.views import generic
-# Create your views here.
+
+from .models import Article, User
 
 
 class IndexView(generic.ListView):
@@ -9,4 +10,10 @@ class IndexView(generic.ListView):
 
     def get_queryset(self):
         """Return ranked articles for a user."""
-        return []
+        return Article.objects.order_by('-created_at')[:10]
+
+
+class ProfileView(generic.DetailView):
+    model = User
+    template_name = 'news/profile.html'
+    context_object_name = 'user_profile'
