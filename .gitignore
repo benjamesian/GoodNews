@@ -1,3 +1,4 @@
+db.sqlite3
 migrations/
 private/
 venv/
@@ -5,4 +6,4 @@ venv/
 *.py[cod]
 *.sw[op]
 .DS_Store
-.vscode
+.vscode/
