@@ -1,3 +1,4 @@
+"""Provide App Models"""
 from django.contrib.auth.models import User
 from django.db import models
 
@@ -12,6 +13,10 @@ class Profile(models.Model):
 class Sentiment(models.Model):
     """Representation of a sentiment"""
     name = models.CharField(max_length=30, null=False, primary_key=True)
+    picture = models.ImageField(upload_to='icons/', blank=True, max_length=254)
+
+    def __str__(self):
+        return f"{self.name} ({self.id})"
 
 
 class ArticleSentimentTag(models.Model):
@@ -20,13 +25,22 @@ class ArticleSentimentTag(models.Model):
     sentiment = models.ForeignKey(Sentiment, on_delete=models.CASCADE)
     magnitude = models.FloatField()
 
+    def __str__(self):
+        return (f"A{self.corpus.id}-{self.sentiment.name}"
+                f"-{self.magnitude} ({self.id})")
+
 
 class Article(models.Model):
     """Representation of an article"""
     url = models.URLField(max_length=254)
+    title = models.CharField(default='Article Title', max_length=254)
     author = models.CharField(max_length=254)
     created_at = models.DateTimeField(default=None)
+    picture_url = models.URLField(blank=True)
     sentiments = models.ManyToManyField(Sentiment, through=ArticleSentimentTag)
+
+    def __str__(self):
+        return f"{self.title[:12]}... ({self.id})"
 
 
 class CommentSentimentTag(models.Model):
