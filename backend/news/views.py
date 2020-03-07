@@ -1,6 +1,8 @@
 """Connect data and routes to relevant views."""
+from django.http import JsonResponse
 from django.views import generic
-from .models import Article, User
+import json
+from .models import Article, ArticleSentimentTag, Sentiment, User
 
 
 class IndexView(generic.ListView):
@@ -13,9 +15,6 @@ class IndexView(generic.ListView):
         """Return ranked articles for a user."""
         articles = super().get_queryset().order_by('-created_at')[:10]
         return articles
-        # return articles.annotate(
-        #     sentiment_tags=[article.sentiments.through.objects.filter(corpus__id=article.id)
-        #                     for article in articles])
 
 
 class ProfileView(generic.DetailView):
@@ -23,3 +22,26 @@ class ProfileView(generic.DetailView):
     model = User
     template_name = 'news/profile.html'
     context_object_name = 'user_profile'
+
+
+def post_articles(request):
+    """Post an article to the database."""
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+    except json.decoder.JSONDecodeError:
+        return JsonResponse({'error': 'bad json'}, 400)
+    articles = data.get('articles', [])
+    for article in articles:
+        new_article = Article(**article.get('article_data', {}))
+        new_article.save()
+        sentiments = article.get('sentiments', [])
+        for sentiment_data in sentiments:
+            sentiment = Sentiment(name=sentiment_data.get('name'))
+            sentiment.save()
+            tag = ArticleSentimentTag(
+                corpus=new_article,
+                sentiment=sentiment,
+                magnitude=sentiment_data.get('magnitude')
+            )
+            tag.save()
+    return JsonResponse({'message': 'added content to db'})

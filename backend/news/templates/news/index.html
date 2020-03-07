@@ -22,7 +22,9 @@
                     <div class="col-md-auto pr-sm-0 pr-md-2 w-auto">
                         <div class="mx-0 my-md-0 my-sm-2" style="height: 65px; overflow: hidden;">
                             {% for sentiment in article.sentiments.all %}
+                            {% if sentiment.picture %}
                             <img src="{{ sentiment.picture.url }}" class="w-auto h-100">
+                            {% endif %}
                             {% empty %}
                             {% endfor %}
                         </div>
