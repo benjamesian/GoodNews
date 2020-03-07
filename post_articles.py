@@ -4,7 +4,7 @@ import json
 import requests
 
 URL_LOGIN = 'http://localhost:8000/admin/'
-URL_ENDPOINT = 'http://localhost:8000/post_articles/'
+URL_ENDPOINT = 'http://localhost:8000/'
 DATA_FILE = 'articles.json'
 
 
