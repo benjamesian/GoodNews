@@ -6,7 +6,7 @@ from django.db import models
 class Profile(models.Model):
     """Definition of a User Profile"""
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    picture = models.ImageField(max_length=254)
+    picture = models.ImageField(upload_to='uploads/', max_length=254)
 
 
 class Sentiment(models.Model):
