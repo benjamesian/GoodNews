@@ -1,5 +1,5 @@
 """Connect data and routes to relevant views."""
-from django.http import JsonResponse
+from django.http import HttpRequest, JsonResponse
 from django.views import generic
 import json
 from .models import Article, ArticleSentimentTag, Sentiment, User
@@ -24,8 +24,10 @@ class ProfileView(generic.DetailView):
     context_object_name = 'user_profile'
 
 
-def post_articles(request):
+def post_articles(request: HttpRequest):
     """Post an article to the database."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'bad route'}, 400)
     try:
         data = json.loads(request.body.decode('utf-8'))
     except json.decoder.JSONDecodeError:
