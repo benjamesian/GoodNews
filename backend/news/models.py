@@ -36,8 +36,7 @@ class Article(models.Model):
     title = models.CharField(default='Article Title', max_length=254)
     author = models.CharField(max_length=254)
     created_at = models.DateTimeField(default=None)
-    picture = models.ImageField(
-        null=True, upload_to='article_images/', max_length=254)
+    picture_url = models.URLField(blank=True)
     sentiments = models.ManyToManyField(Sentiment, through=ArticleSentimentTag)
 
     def __str__(self):
