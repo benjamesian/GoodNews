@@ -42,10 +42,10 @@ def get_batch_sentiments(articles):
 
 
 def process_articles(articles):
-    article_titles = map(lambda x: x.get('title'), articles)
+    article_titles = map(lambda x: x.get('title', ''), articles)
     raw_sentiments = get_batch_sentiments(article_titles)
     raw_sentiments = [
-        sent.get('document_tone').get('tones')
+        sent.get('document_tone', {}).get('tones', [])
         for sent in raw_sentiments
     ]
     articles_data = {
@@ -80,16 +80,17 @@ def process_articles(articles):
 
 
 def handle_connection(connection):
-    try:
-        data = b''
+    data = b''
+    with connection:
         while True:
             new_data = connection.recv(1024)
             data += new_data
             if not new_data:
                 break
+    try:
         process_articles(json.load(data))
-    finally:
-        connection.close()
+    except json.JSONDecodeError:
+        pass
 
 
 if __name__ == "__main__":
