@@ -1,5 +1,5 @@
 import json
-from language_processing.ibmcloud import get_sentiments
+from language_processing.ibmcloud.ibmcloud import get_sentiments
 from multiprocessing import Pool
 import os
 import requests

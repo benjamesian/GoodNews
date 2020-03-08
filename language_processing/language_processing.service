@@ -5,11 +5,11 @@ After=network.target
 [Service]
 User=ubuntu
 Group=www-data
-WorkingDirectory=/home/ubuntu/GoodNews/language_processing
+WorkingDirectory=/home/ubuntu/GoodNews
 Environment=GOOD_NEWS_IBM_CLOUD_API_KEY=bj0gTWmYfHV03xyqZ-nnzZSQhQzMNADgwbttOH9NTWuS
 Environment=GOOD_NEWS_USERNAME=admin
 Environment=GOOD_NEWS_PASSWORD=adminPassword
-ExecStart=python3 -m main.py
+ExecStart=/usr/bin/python3 -m language_processing.main
 
 [Install]
 WantedBy=multi-user.target
