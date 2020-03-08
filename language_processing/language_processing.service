@@ -1,0 +1,15 @@
+[Unit]
+Description=Gunicorn instance to serve language_processing
+After=network.target
+
+[Service]
+User=ubuntu
+Group=www-data
+WorkingDirectory=/home/ubuntu/GoodNews/language_processing
+Environment=GOOD_NEWS_IBM_CLOUD_API_KEY=bj0gTWmYfHV03xyqZ-nnzZSQhQzMNADgwbttOH9NTWuS
+Environment=GOOD_NEWS_USERNAME=admin
+Environment=GOOD_NEWS_PASSWORD=adminPassword
+ExecStart=python3 -m main.py
+
+[Install]
+WantedBy=multi-user.target
