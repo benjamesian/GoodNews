@@ -1,0 +1,18 @@
+{% if user_profile %}
+<div class="card" style="width: 18rem;">
+    <div class="card-body">
+        <img class="img-responsive" src="{{ user_profile.profile.picture.url }}" width="100px" height="100px"
+            align="left">
+        <h1 class="card-title">{{ user_profile.username }}</h1>
+        <h6 class="card-subtitle mb-2 text-muted">Card subtitle</h6>
+        <p class="card-text">Some quick example text to build on the card title and make up the bulk of the card's
+            content.</p>
+        <a href="#" class="card-link">Card link</a>
+        <a href="#" class="card-link">Another link</a>
+    </div>
+</div>
+howdy {{ user_profile.profile.picture.url }}
+{{ user_profile.username }}
+{% else %}
+No user has this username
+{% endif %}
