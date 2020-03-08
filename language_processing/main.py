@@ -4,6 +4,7 @@ from multiprocessing import Pool
 import os
 import requests
 import socket
+from threading import Thread
 
 
 URL_LOGIN = 'http://localhost:8000/admin/'
@@ -78,6 +79,19 @@ def process_articles(articles):
 #     return [json.dumps(body)]
 
 
+def handle_connection(connection):
+    try:
+        data = b''
+        while True:
+            new_data = connection.recv(1024)
+            data += new_data
+            if not new_data:
+                break
+        process_articles(json.load(data))
+    finally:
+        connection.close()
+
+
 if __name__ == "__main__":
     server_address = './uds_socket'
 
@@ -93,13 +107,5 @@ if __name__ == "__main__":
 
         while True:
             connection, client_address = sock.accept()
-            try:
-                data = b''
-                while True:
-                    new_data = connection.recv(1024)
-                    data += new_data
-                    if not new_data:
-                        break
-                process_articles(json.load(data))
-            finally:
-                connection.close()
+            ct = Thread(target=handle_connection, args=(connection,))
+            ct.run()
