@@ -108,4 +108,4 @@ if __name__ == "__main__":
         while True:
             connection, client_address = sock.accept()
             ct = Thread(target=handle_connection, args=(connection,))
-            ct.run()
+            ct.start()
