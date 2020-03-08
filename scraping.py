@@ -3,7 +3,7 @@
 Get articles from the web
 """
 import sys
-from scraping.core import main     # pylint: disable=import-self
+from scraping import main     # pylint: disable=import-self
 
 if __name__ == '__main__':
     sys.exit(main())
