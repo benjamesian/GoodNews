@@ -1,10 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
 {% if user_profile %}
 <div class="card" style="width: 18rem;">
     <div class="card-body">
-        <img class="img-responsive" src="{{ user_profile.profile.picture.url }}" width="100px" height="100px"
+        <img class="img-responsive m-1" src="{{ user_profile.profile.picture.url }}" width="100px" height="100px"
             align="left">
         <h1 class="card-title">{{ user_profile.username }}</h1>
-        <h6 class="card-subtitle mb-2 text-muted">Card subtitle</h6>
+        <h6 class="card-subtitle mb-2 text-muted">{{ user_profile.profile.status|default:"" }}</h6>
         <p class="card-text">Some quick example text to build on the card title and make up the bulk of the card's
             content.</p>
         <a href="#" class="card-link">Card link</a>
@@ -16,3 +19,4 @@ howdy {{ user_profile.profile.picture.url }}
 {% else %}
 No user has this username
 {% endif %}
+{% endblock %}
