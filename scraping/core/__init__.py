@@ -2,4 +2,3 @@
 """
 Provides a module to collect news from The Guardian
 """
-API = 'https://content.guardianapis.com'

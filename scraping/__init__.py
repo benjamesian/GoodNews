@@ -2,8 +2,8 @@
 """
 Provides tools to collect news articles from the web
 """
-from scraping import theguardian
+from scraping.theguardian.client import Client as TheGuardianClient
+from scraping.core.main import main
 
-CLIENTS = {
-    theguardian.client.Client
-}
+API_CLIENTS = [TheGuardianClient]
+SOCKET_PATH = './uds_socket'
