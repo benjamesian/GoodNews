@@ -11,7 +11,7 @@ service {'language_processing.service':
 file {'language_processing.service':
   ensure  => file,
   path    => '/etc/systemd/system/language_processing.service',
-  source  => '/data/current/GoodNews/etc/systemd/system/language_processing.service',
+  source  => '/data/current/etc/systemd/system/language_processing.service',
   mode    => '0644',
   owner   => 'root',
   group   => 'root',

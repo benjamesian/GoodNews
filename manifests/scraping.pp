@@ -24,12 +24,12 @@ file {
 
   'scraping.timer':
     path    => '/etc/systemd/system/scraping.timer',
-    source  => '/data/current/GoodNews/etc/systemd/system/scraping.timer',
+    source  => '/data/current/etc/systemd/system/scraping.timer',
     require => Exec['stop timer'];
 
   'scraping.service':
     path    => '/etc/systemd/system/scraping.service',
-    source  => '/data/current/GoodNews/etc/systemd/system/scraping.service',
+    source  => '/data/current/etc/systemd/system/scraping.service',
     require => Service['scraping.service'],
     before  => Service['scraping.timer'];
 }
