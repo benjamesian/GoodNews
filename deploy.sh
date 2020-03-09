@@ -26,10 +26,10 @@ mkdir -p /data/current /data/releases
 cd /data
 if test -d releases/GoodNews-$datetime
 then
-  cd current
+  cd current || exit 1
   ln -snf ../releases/GoodNews-$datetime/*/ .
-  cd manifests
-  printf '%s\0' *.pp | xargs -0 -I {} puppet apply {}
+  cd manifests || exit 1
+  printf '%s\\0' *.pp | xargs -0 -I {} sudo --non-interactive puppet apply {}
 fi
 exit
 EOF
