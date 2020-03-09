@@ -4,6 +4,7 @@ from multiprocessing import Pool
 import os
 import requests
 import socket
+from threading import Thread
 
 
 URL_LOGIN = 'http://localhost:8000/admin/'
@@ -41,10 +42,10 @@ def get_batch_sentiments(articles):
 
 
 def process_articles(articles):
-    article_titles = map(lambda x: x.get('title'), articles)
+    article_titles = map(lambda x: x.get('title', ''), articles)
     raw_sentiments = get_batch_sentiments(article_titles)
     raw_sentiments = [
-        sent.get('document_tone').get('tones')
+        sent.get('document_tone', {}).get('tones', [])
         for sent in raw_sentiments
     ]
     articles_data = {
@@ -78,6 +79,20 @@ def process_articles(articles):
 #     return [json.dumps(body)]
 
 
+def handle_connection(connection):
+    data = b''
+    with connection:
+        while True:
+            new_data = connection.recv(1024)
+            data += new_data
+            if not new_data:
+                break
+    try:
+        process_articles(json.load(data))
+    except json.JSONDecodeError:
+        pass
+
+
 if __name__ == "__main__":
     server_address = './uds_socket'
 
@@ -93,13 +108,5 @@ if __name__ == "__main__":
 
         while True:
             connection, client_address = sock.accept()
-            try:
-                data = b''
-                while True:
-                    new_data = connection.recv(1024)
-                    data += new_data
-                    if not new_data:
-                        break
-                process_articles(json.load(data))
-            finally:
-                connection.close()
+            ct = Thread(target=handle_connection, args=(connection,))
+            ct.start()
