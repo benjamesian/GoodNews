@@ -8,11 +8,12 @@ service {'scraping.timer':
   subscribe => Exec['daemon-reload'],
 }
 
-# service {'scraping.service':
-#   ensure   => stopped,
-#   enable   => manual,
-#   provider => systemd,
-# }
+service {'scraping.service':
+  ensure   => stopped,
+  enable   => false,
+  provider => systemd,
+  requires => Service['scraping.timer']
+}
 
 file {'scraping.timer':
   ensure  => file,
