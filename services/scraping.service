@@ -1,0 +1,10 @@
+[Unit]
+Description=Get recent news from the web and submit it for sentiment analysis
+Documentation=man:python(1)
+After=network.json
+
+[Service]
+User=ubuntu
+Group=www-data
+ExecStart=/usr/bin/env python3 -m scraping.main
+WorkingDirectory=/home/ubuntu/GoodNews
