@@ -8,11 +8,11 @@ service {'scraping.timer':
   subscribe => Exec['daemon-reload'],
 }
 
-service {'scraping.service':
-  ensure   => stopped,
-  enable   => manual,
-  provider => systemd,
-}
+# service {'scraping.service':
+#   ensure   => stopped,
+#   enable   => manual,
+#   provider => systemd,
+# }
 
 file {'scraping.timer':
   ensure  => file,
@@ -26,14 +26,14 @@ file {'scraping.timer':
 }
 
 file {'scraping.service':
-  ensure  => file,
-  mode    => '0644',
-  owner   => 'root',
-  group   => 'root',
-  notify  => Exec['daemon-reload'],
-  require => Service['scraping.service'],
-  path    => '/etc/systemd/system/scraping.service',
-  source  => '/data/current/etc/systemd/system/scraping.service',
+  ensure => file,
+  mode   => '0644',
+  owner  => 'root',
+  group  => 'root',
+  # require => Service['scraping.service'],
+  before => File['scraping.timer'],
+  path   => '/etc/systemd/system/scraping.service',
+  source => '/data/current/etc/systemd/system/scraping.service',
 }
 
 
