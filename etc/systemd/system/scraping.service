@@ -1,7 +1,7 @@
 [Unit]
 Description=Get recent news from the web and submit it for sentiment analysis
 Documentation=man:python(1)
-After=network.json
+After=network.target
 
 [Service]
 User=ubuntu
