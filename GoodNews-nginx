@@ -33,8 +33,7 @@ server {
 	#
 	# include snippets/snakeoil.conf;
 
-	root /var/www/html;
-rewrite ^/redirect_me https://www.google.com permanent; error_page 404 /custom_404.html; location = /custom_404.html { root /usr/share/nginx/html; internal; }
+	root /home/ubuntu/GoodNews/static/;
 
 	# Add index.php to the list if you are using PHP
 	index index.html index.htm index.nginx-debian.html;
