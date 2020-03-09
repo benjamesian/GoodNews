@@ -7,4 +7,4 @@ After=network.json
 User=ubuntu
 Group=www-data
 ExecStart=/usr/bin/env python3 -m scraping.main
-WorkingDirectory=/home/ubuntu/GoodNews
+WorkingDirectory=/data/current

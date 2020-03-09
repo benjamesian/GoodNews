@@ -29,7 +29,7 @@ then
   cd current || exit 1
   ln -snf ../releases/GoodNews-$datetime/*/ .
   cd manifests || exit 1
-  printf '%s\\0' *.pp | xargs -0 -I {} sudo --non-interactive puppet apply {}
+  printf '%s\\0' ./*.pp | xargs -0 -I {} sudo --non-interactive puppet apply {}
 fi
 exit
 EOF
