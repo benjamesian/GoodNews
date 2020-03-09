@@ -7,6 +7,7 @@ from django.db import models
 class Profile(models.Model):
     """Definition of a User Profile"""
     user = models.OneToOneField(User, on_delete=models.CASCADE)
+    status = models.CharField(max_length=100, null=True, blank=True)
     picture = models.ImageField(upload_to='uploads/', max_length=254)
 
 
