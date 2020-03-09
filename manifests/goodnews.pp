@@ -1,17 +1,17 @@
 # Set up the language processing service on a server
 
-service {'language_processing.service':
+service {'goodnews.service':
   ensure    => running,
   enable    => true,
   provider  => systemd,
-  require   => File['language_processing.service'],
+  require   => File['goodnews.service'],
   subscribe => Exec['daemon-reload'],
 }
 
-file {'language_processing.service':
+file {'goodnews.service':
   ensure  => file,
-  path    => '/etc/systemd/system/language_processing.service',
-  source  => '/data/current/GoodNews/etc/systemd/system/language_processing.service',
+  path    => '/etc/systemd/system/goodnews.service',
+  source  => '/data/current/GoodNews/etc/systemd/system/goodnews.service',
   mode    => '0644',
   owner   => 'root',
   group   => 'root',
@@ -20,7 +20,7 @@ file {'language_processing.service':
 }
 
 exec {'stop':
-  command => 'systemctl stop language_processing',
+  command => 'systemctl stop goodnews',
   path    => '/usr/bin:/bin',
 }
 
