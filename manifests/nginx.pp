@@ -1,10 +1,9 @@
 # Set up the language processing service on a server
 
 service {'nginx.service':
-  ensure    => running,
-  enable    => true,
-  require   => File['sites-enabled'],
-  subscribe => Exec['daemon-reload'],
+  ensure  => running,
+  enable  => true,
+  require => [File['sites-enabled'], File['sites-disabled']],
 }
 
 file {'sites-available':
@@ -21,11 +20,9 @@ file {'sites-enabled':
   path    => '/etc/nginx/sites-enabled/GoodNews',
   target  => '../sites-available/GoodNews',
   require => File['sites-available'],
-  notify  => Exec['daemon-reload'],
 }
 
-exec {'daemon-reload':
-  command     => 'systemctl daemon-reload',
-  path        => '/usr/bin:/bin',
-  refreshonly => true,
+file {'sites-disabled':
+  ensure => absent,
+  path   => '/etc/nginx/sites-enabled/default',
 }
