@@ -18,7 +18,7 @@ file {'sites-available':
 
 file {'sites-enabled':
   ensure  => link,
-  path    => '/etc/ngsnx/sites-enabled/GoodNews',
+  path    => '/etc/nginx/sites-enabled/GoodNews',
   target  => '../sites-available/GoodNews',
   require => File['sites-available'],
   notify  => Exec['daemon-reload'],
