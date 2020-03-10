@@ -1,4 +1,4 @@
-# Set up the language processing service on a server
+# Configure nginx to host the current release of GoodNews
 
 service {'nginx.service':
   ensure  => running,

@@ -1,4 +1,4 @@
-# Set up the language processing service on a server
+# Configure the goodnews service
 
 service {'goodnews.service':
   ensure    => running,

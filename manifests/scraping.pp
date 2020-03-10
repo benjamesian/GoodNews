@@ -1,4 +1,4 @@
-# Set up the scraping service on a server
+# Configure the scraping service
 
 service {'scraping.service':
   ensure    => stopped,

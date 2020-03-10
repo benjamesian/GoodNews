@@ -1,4 +1,4 @@
-# Set up the language processing service on a server
+# Configure the language processing service
 
 service {'language_processing.service':
   ensure    => running,
