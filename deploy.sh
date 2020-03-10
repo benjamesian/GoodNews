@@ -1,37 +1,57 @@
 #!/usr/bin/env bash
+# Deploy snapshots of the GoodNews project
 #
-# Deploy GoodNews
-#
-# 1. Copy files to servers at /data/releases/GoodNews-%Y-%m-%dT%H:%M:%S
-# 2. On each server symlink release subdirectories into /data/current
-# 3. Apply puppet manifests
+# For each server:
+# 1. Copy a snapshot to the server's `releases' directory.
+# 2. Link the snapshot in the `current' release directory.
+# 3. Install unmet dependencies (i.e. `pip', `apt').
+# 4. Apply configuration via puppet manifests.
+########################################################
 
-servers=(
-  35.196.167.155
-  34.73.252.236
+if [[ -v DEBUG ]]
+then
+  set -o verbose -o xtrace
+fi
+
+set -o errexit
+declare -A SERVERS
+
+PROJECT="$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)"
+SERVERS=(
+  ['web-01']='35.196.167.155'
+  ['web-02']='34.73.252.236'
 )
-datetime="$(date --utc '+%FT%H')"
-tmpdir="$(mktemp -d --tmpdir "${0##*/}-XXXXXXXX")"
-trap 'rm -rf -- "${tmpdir}"' EXIT
-printf '%s\0' "${servers[@]}" |
-  xargs -0 -P 0 -I {} rsync -avz . ubuntu@{}:/data/releases/GoodNews-"$datetime"
+LOGFILE="${PROJECT}/deploy.log"
+RELEASE="GoodNews-$(date --utc '+%Y%m%d%H%M%S')"
+DESTDIR="/data/releases/${RELEASE}"
+WORKDIR="$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXXX")"
 
-for id in "${!servers[@]}"
+trap 'rm -rf -- "${WORKDIR}"' EXIT
+set +o errexit
+
+parallel -i rsync -ahz --info=flist1,progress2,stats2 --log-file="${LOGFILE}" \
+  "${PROJECT}/" "ubuntu@{}:${DESTDIR}" -- "${SERVERS[@]}"
+
+for ID in "${!SERVERS[@]}"
 do
-  mkfifo -- "$tmpdir/$id-in"
-  (ssh -t ubuntu@"${servers[$id]}") <"$tmpdir/$id-in" >"$tmpdir/$id-out" &
+  mkfifo -- "${WORKDIR}/i${ID}"
+  (< "${WORKDIR}/i${ID}" ssh -tt "ubuntu@${SERVERS[${ID}]}"
+  )> "${WORKDIR}/o${ID}" &
 done
-tee -a "$tmpdir"/*-in << EOF
+
+tee -a "${WORKDIR}"/i* << EOF
+set -e
 mkdir -p /data/current /data/releases
 cd /data
-if test -d releases/GoodNews-$datetime
+if test -d /data/releases/${RELEASE}
 then
-  cd current || exit 1
-  ln -snf ../releases/GoodNews-$datetime/*/ .
-  cd manifests || exit 1
-  printf '%s\\0' ./*.pp | xargs -0 -I {} sudo --non-interactive puppet apply {}
+  cd current
+  ln -snf ../releases/${RELEASE}/*/ .
+  cd manifests
+  parallel sudo --non-interactive puppet apply -- *.pp
 fi
 exit
 EOF
+
 wait
-cat "$tmpdir"/*-out
+cat "${WORKDIR}"/o*

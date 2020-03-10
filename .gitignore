@@ -1,7 +1,7 @@
 db.sqlite3
 credentials/
 migrations/
-private/
+static/
 venv/
 *~
 *.py[cod]
@@ -9,4 +9,3 @@ venv/
 *.log
 .DS_Store
 .vscode/
-static/
