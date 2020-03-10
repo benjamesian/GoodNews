@@ -42,15 +42,12 @@ do
 done
 
 tee -a "${WORKDIR}"/i* << EOF
-set -e
-mkdir -p /data/current /data/releases
-cd /data
-if test -d /data/releases/${RELEASE}
+mkdir -p /data/releases
+if test -d "/data/releases/${RELEASE}"
 then
-  cd current
-  ln -snf ../releases/${RELEASE}/*/ .
-  cd manifests
-  parallel sudo --non-interactive puppet apply -- *.pp
+  cd /data
+  ln -snf "releases/${RELEASE}" current
+  parallel sudo --non-interactive puppet apply -- current/manifests/*.pp
 fi
 exit
 EOF
