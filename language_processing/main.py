@@ -79,16 +79,17 @@ def process_articles(articles):
 #     return [json.dumps(body)]
 
 
-def handle_connection(connection):
+def handle_connection(connection: socket.socket):
     data = b''
     with connection:
         while True:
             new_data = connection.recv(1024)
             data += new_data
             if not new_data:
+                connection.sendall("OK")
                 break
     try:
-        process_articles(json.load(data))
+        process_articles(json.loads(data.decode('utf-8')))
     except json.JSONDecodeError:
         pass
 
@@ -108,5 +109,6 @@ if __name__ == "__main__":
 
         while True:
             connection, client_address = sock.accept()
+            print(f"accepted connection from {client_address}")
             ct = Thread(target=handle_connection, args=(connection,))
             ct.start()
