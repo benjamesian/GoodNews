@@ -27,22 +27,30 @@ PROJECT="$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)"
 RELEASE="${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')"
 LOGFILE="${PROJECT}/deploy.log"
 EXCLUDE="${PROJECT}/deploy.ignore"
-DESTDIR="/data/releases/${RELEASE}"
-
 WORKDIR="$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")"
 trap 'rm -rf -- "${WORKDIR}"' EXIT
 
 set +o errexit    # Setup complete.
 
+# Define a function to make a local archive of a release
+# usage: deploy::archive
+deploy::archive()
+{
+  local -
+  set -o verbose
+  rsync -a --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "${WORKDIR}/${RELEASE}"
+  tar -czf "${WORKDIR}/${RELEASE}.tar.gz" -C "${WORKDIR}" -- "${RELEASE}"
+} > /dev/null
+
 # Define a function to upload a release to a single host
 # usage: deploy::upload USER@HOST
 deploy::upload()
 {
-  tee -a /dev/stderr | ssh -T -- "$1"
-  rsync -az --stats --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "$1:${DESTDIR}"
+  tee >(cat - >&2) | ssh -T -- "ubuntu@$1"
+  scp -- "${WORKDIR}/${RELEASE}.tar.gz" "ubuntu@$1:/data/releases"
 } << EOF
 sudo --non-interactive mkdir -p /data/releases
-sudo --non-interactive chown -R '${1%%@*}:${1%%@*}' /data
+sudo --non-interactive chown -R ubuntu:ubuntu /data
 exit
 EOF
 
@@ -50,15 +58,21 @@ EOF
 # usage: deploy::install USER@HOST
 deploy::install()
 {
-  tee -a /dev/stderr | ssh -T -- "$1"
+  tee >(cat - >&2) | ssh -T -- "ubuntu@$1"
 } << EOF
-sudo --non-interactive chown -R '${1%%@*}:${1%%@*}' '${DESTDIR/\'/\'\\\'\'}'
-rm -fr /data/current
-ln -s -- '${DESTDIR/\'/\'\\\'\'}' /data/current
+cd /data/releases
+tar -xzf '${RELEASE/\'/\'\\\'\'}.tar.gz'
+sudo --non-interactive chown -R ubuntu:ubuntu '${RELEASE/\'/\'\\\'\'}'
+cd /data
+rm -fr current
+ln -s 'releases/${RELEASE/\'/\'\\\'\'}' current
 find /data/current/manifests -maxdepth 1 -name '*.pp' -type f -execdir \
   sudo --non-interactive puppet apply -- '{}' ';'
 exit
 EOF
+
+# Locally archive a current copy of the project repo
+deploy::archive
 
 # Upload to hosts in parallel with a separate log for each
 printf 'Uploading to:\n'
@@ -66,7 +80,7 @@ for (( INDEX = 1; INDEX <= $#; ++INDEX ))
 do
   printf '%s\n' "${!INDEX}"
   { printf '%s: %s\n' "$(date '+%c')" "${!INDEX}"
-    (deploy::upload "ubuntu@${!INDEX}") &
+    (deploy::upload "${!INDEX}") &
   } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").0.output"
 done
 wait
@@ -78,7 +92,7 @@ for (( INDEX = 1; INDEX <= $#; ++INDEX ))
 do
   printf '%s\n' "${!INDEX}"
   { printf '%s: %s\n' "$(date '+%c')" "${!INDEX}"
-    (deploy::install "ubuntu@${!INDEX}") &
+    (deploy::install "${!INDEX}") &
   } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").1.output"
 done
 wait
