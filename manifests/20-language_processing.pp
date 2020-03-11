@@ -17,6 +17,12 @@ file {'language_processing.service':
   notify => Exec['daemon-reload'],
 }
 
+exec {'restart':
+  command => 'systemctl restart language_processing.service',
+  path    => '/usr/bin:/bin',
+  require => Service['language_processing.service'],
+}
+
 exec {'daemon-reload':
   command     => 'systemctl daemon-reload',
   path        => '/usr/bin:/bin',
