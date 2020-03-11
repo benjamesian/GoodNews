@@ -38,7 +38,7 @@ set +o errexit    # Setup complete.
 # usage: deploy::upload USER@HOST
 deploy::upload()
 {
-  ssh -- "$1"
+  tee -a /dev/stderr | ssh -T -- "$1"
   rsync -az --stats --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "$1:${DESTDIR}"
 } << EOF
 sudo --non-interactive mkdir -p /data/releases
@@ -50,7 +50,7 @@ EOF
 # usage: deploy::install USER@HOST
 deploy::install()
 {
-  ssh -- "$1"
+  tee -a /dev/stderr | ssh -T -- "$1"
 } << EOF
 sudo --non-interactive chown -R '${1%%@*}:${1%%@*}' '${DESTDIR/\'/\'\\\'\'}'
 rm -fr /data/current
@@ -61,7 +61,7 @@ exit
 EOF
 
 # Upload to hosts in parallel with a separate log for each
-printf '# Uploading to:\n'
+printf 'Uploading to:\n'
 for (( INDEX = 1; INDEX <= $#; ++INDEX ))
 do
   printf '%s\n' "${!INDEX}"
@@ -73,7 +73,7 @@ wait
 cat -- "${WORKDIR}"/*.0.output
 
 # Install on hosts in parallel with a separate log for each
-printf '# Installing on:\n'
+printf 'Installing on:\n'
 for (( INDEX = 1; INDEX <= $#; ++INDEX ))
 do
   printf '%s\n' "${!INDEX}"
