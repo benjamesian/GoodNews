@@ -18,10 +18,12 @@ then
   set -o verbose -o xtrace
 fi
 
-if ! (( $# ))
-then
-  set -- '35.196.167.155' '34.73.252.236'
-fi
+declare -A TARGETS
+TARGETS=(
+  [web-01]=35.196.167.155
+  [web-02]=34.73.252.236
+)
+set -- "${!TARGETS[@]}"
 
 PROJECT="$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)"
 RELEASE="${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')"
@@ -38,9 +40,10 @@ set +o errexit    # Setup complete.
 # usage: deploy::upload USER@HOST
 deploy::upload()
 {
-  tee -a /dev/stderr | ssh -T -- "$1"
+  ssh -t -- "$1"
   rsync -az --stats --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "$1:${DESTDIR}"
 } << EOF
+set -o errexit
 sudo --non-interactive mkdir -p /data/releases
 sudo --non-interactive chown -R '${1%%@*}:${1%%@*}' /data
 exit
@@ -50,8 +53,9 @@ EOF
 # usage: deploy::install USER@HOST
 deploy::install()
 {
-  tee -a /dev/stderr | ssh -T -- "$1"
+  ssh -t -- "$1"
 } << EOF
+set -o errexit
 sudo --non-interactive chown -R '${1%%@*}:${1%%@*}' '${DESTDIR/\'/\'\\\'\'}'
 rm -fr /data/current
 ln -s -- '${DESTDIR/\'/\'\\\'\'}' /data/current
@@ -61,28 +65,28 @@ exit
 EOF
 
 # Upload to hosts in parallel with a separate log for each
-printf 'Uploading to:\n'
+echo 'Uploading...'
 for (( INDEX = 1; INDEX <= $#; ++INDEX ))
 do
-  printf '%s\n' "${!INDEX}"
-  { printf '%s: %s\n' "$(date '+%c')" "${!INDEX}"
-    (deploy::upload "ubuntu@${!INDEX}") &
-  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").0.output"
+  # shellcheck disable=SC2183
+  { printf '%s: %s [%s]\n' "$(date '+%c')" "${!INDEX}" "${TARGETS[${!INDEX}]}"
+    (deploy::upload "ubuntu@${TARGETS[${!INDEX}]}") &
+  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").0.log"
 done
 wait
-cat -- "${WORKDIR}"/*.0.output
+cat -- "${WORKDIR}"/*.0.log
 
 # Install on hosts in parallel with a separate log for each
-printf 'Installing on:\n'
+echo 'Installing...'
 for (( INDEX = 1; INDEX <= $#; ++INDEX ))
 do
-  printf '%s\n' "${!INDEX}"
-  { printf '%s: %s\n' "$(date '+%c')" "${!INDEX}"
-    (deploy::install "ubuntu@${!INDEX}") &
-  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").1.output"
+  # shellcheck disable=SC2183
+  { printf '%s: %s [%s]\n' "$(date '+%c')" "${!INDEX}" "${TARGETS[${!INDEX}]}"
+    (deploy::install "ubuntu@${TARGETS[${!INDEX}]}") &
+  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").1.log"
 done
 wait
-cat -- "${WORKDIR}"/*.1.output
+cat -- "${WORKDIR}"/*.1.log
 
 # Append to master log
-cat -- "${WORKDIR}"/*.output >> "${LOGFILE}"
+cat -- "${WORKDIR}"/*.log >> "${LOGFILE}"
