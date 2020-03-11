@@ -8,49 +8,85 @@
 # 4. Apply configuration via puppet manifests.
 ########################################################
 
-if [[ -v DEBUG ]]
+# Set up the environment.
+
+set -o errexit    # If an error occurs during setup, exit.
+
+if [[ -v DEBUG ]] # Enable debugging output.
 then
+  exec {BASH_XTRACEFD}>&2
   set -o verbose -o xtrace
 fi
 
-set -o errexit
-declare -A SERVERS
+declare -A TARGETS
+TARGETS=(
+  [web-01]=35.196.167.155
+  [web-02]=34.73.252.236
+)
+set -- "${!TARGETS[@]}"
 
 PROJECT="$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)"
-RELEASE="GoodNews-$(date --utc '+%Y%m%d%H%M%S')"
-SERVERS=(
-  ['web-01']='35.196.167.155'
-  ['web-02']='34.73.252.236'
-)
+RELEASE="${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')"
 LOGFILE="${PROJECT}/deploy.log"
 EXCLUDE="${PROJECT}/deploy.ignore"
 DESTDIR="/data/releases/${RELEASE}"
-WORKDIR="$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXXX")"
 
+WORKDIR="$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")"
 trap 'rm -rf -- "${WORKDIR}"' EXIT
-set +o errexit
 
-parallel -i rsync -ahz --info=flist1,progress2,stats2 \
-  --log-file="${LOGFILE}" --exclude-from="${EXCLUDE}" \
-  "${PROJECT}/" "ubuntu@{}:${DESTDIR}" -- "${SERVERS[@]}"
+set +o errexit    # Setup complete.
 
-for ID in "${!SERVERS[@]}"
-do
-  mkfifo -- "${WORKDIR}/i${ID}"
-  (< "${WORKDIR}/i${ID}" ssh -tt "ubuntu@${SERVERS[${ID}]}"
-  )> "${WORKDIR}/o${ID}" &
-done
-
-tee -a "${WORKDIR}"/i* << EOF
-mkdir -p /data/releases
-if test -d "/data/releases/${RELEASE}"
-then
-  cd /data
-  ln -snf "releases/${RELEASE}" current
-  parallel sudo --non-interactive puppet apply -- current/manifests/*.pp
-fi
+# Define a function to upload a release to a single host
+# usage: deploy::upload USER@HOST
+deploy::upload()
+{
+  ssh -t -- "$1"
+  rsync -az --stats --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "$1:${DESTDIR}"
+} << EOF
+set -o errexit
+sudo --non-interactive mkdir -p /data/releases
+sudo --non-interactive chown -R '${1%%@*}:${1%%@*}' /data
 exit
 EOF
 
+# Define a function to install a release on a single host
+# usage: deploy::install USER@HOST
+deploy::install()
+{
+  ssh -t -- "$1"
+} << EOF
+set -o errexit
+sudo --non-interactive chown -R '${1%%@*}:${1%%@*}' '${DESTDIR/\'/\'\\\'\'}'
+rm -fr /data/current
+ln -s -- '${DESTDIR/\'/\'\\\'\'}' /data/current
+find /data/current/manifests -maxdepth 1 -name '*.pp' -type f -execdir \
+  sudo --non-interactive puppet apply -- '{}' ';'
+exit
+EOF
+
+# Upload to hosts in parallel with a separate log for each
+echo 'Uploading...'
+for (( INDEX = 1; INDEX <= $#; ++INDEX ))
+do
+  # shellcheck disable=SC2183
+  { printf '%s: %s [%s]\n' "$(date '+%c')" "${!INDEX}" "${TARGETS[${!INDEX}]}"
+    (deploy::upload "ubuntu@${TARGETS[${!INDEX}]}") &
+  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").0.log"
+done
 wait
-cat "${WORKDIR}"/o*
+cat -- "${WORKDIR}"/*.0.log
+
+# Install on hosts in parallel with a separate log for each
+echo 'Installing...'
+for (( INDEX = 1; INDEX <= $#; ++INDEX ))
+do
+  # shellcheck disable=SC2183
+  { printf '%s: %s [%s]\n' "$(date '+%c')" "${!INDEX}" "${TARGETS[${!INDEX}]}"
+    (deploy::install "ubuntu@${TARGETS[${!INDEX}]}") &
+  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").1.log"
+done
+wait
+cat -- "${WORKDIR}"/*.1.log
+
+# Append to master log
+cat -- "${WORKDIR}"/*.log >> "${LOGFILE}"

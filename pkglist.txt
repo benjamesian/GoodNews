@@ -1,3 +1,2 @@
-moreutils
 python3-dev
 puppet
