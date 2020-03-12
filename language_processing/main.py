@@ -8,8 +8,8 @@ import socket
 from threading import Thread
 
 
-URL_LOGIN = 'http://localhost:8000/admin/'
-URL_ENDPOINT = 'http://localhost:8000/'
+URL_LOGIN = 'https://34.73.94.209/admin/'
+URL_ENDPOINT = 'https://34.73.94.209/'
 
 USERNAME = os.getenv('GOOD_NEWS_USERNAME')
 PASSWORD = os.getenv('GOOD_NEWS_PASSWORD')
