@@ -1,17 +1,23 @@
 import json
 from language_processing.ibmcloud.ibmcloud import get_sentiments
+import logging
 from multiprocessing import Pool
 import os
 import requests
 import socket
 from threading import Thread
 
-
-URL_LOGIN = 'http://localhost:8000/admin/'
-URL_ENDPOINT = 'http://localhost:8000/'
+# 34.73.94.209
+URL_LOGIN = 'http://35.196.167.155:5000/admin/'
+URL_ENDPOINT = 'http://35.196.167.155/'
 
 USERNAME = os.getenv('GOOD_NEWS_USERNAME')
 PASSWORD = os.getenv('GOOD_NEWS_PASSWORD')
+
+# ips = {
+#     '801-web-01': '35.196.167.155',
+#     '801-web-02': '34.73.252.236'
+# }
 
 
 def add_articles(articles):
@@ -27,11 +33,12 @@ def add_articles(articles):
                           next='/')
         session.post(URL_LOGIN, data=login_data,
                      headers=dict(Referer=URL_LOGIN))
+
         session.headers.update({
             'content-type': 'application/json',
             'X-CSRFToken': session.cookies.get('csrftoken')
         })
-
+        print('posting', articles)
         session.post(URL_ENDPOINT, data=json.dumps(articles))
 
 
@@ -79,22 +86,76 @@ def process_articles(articles):
 #     return [json.dumps(body)]
 
 
-def handle_connection(connection: socket.socket):
+# def recvall(connection: socket.socket, chunksize: int, json=False) -> bytes:
+#     data = b''
+#     while True:
+#         recv_data = connection.recv(chunksize)
+#         if not recv_data:
+#             break
+#         data += recv_data
+#     return data
+
+def add_length_header(data: bytes) -> bytes:
+    length = str(len(data)).encode()
+    header = (b'<length ' + length + b'>').ljust(32)
+    return header + data
+
+
+def consume_length_header(connection: socket.socket) -> int:
+    raw_header = connection.recv(32)
+    content_length = raw_header.strip(b'<length> ')
+    return int(content_length)
+
+
+def get_data(connection: socket.socket, chunksize: int = 4096) -> bytes:
+    bytes_remaining = consume_length_header(connection)
+
     data = b''
-    with connection:
-        while True:
-            new_data = connection.recv(1024)
-            data += new_data
-            if not new_data:
-                connection.sendall("OK")
-                break
-    try:
-        process_articles(json.loads(data.decode('utf-8')))
-    except json.JSONDecodeError:
-        pass
+    while bytes_remaining > chunksize:
+        data += connection.recv(chunksize)
+        bytes_remaining -= chunksize
+    data += connection.recv(bytes_remaining)
+
+    return data
 
 
-if __name__ == "__main__":
+def handle_connection(connection: socket.socket):
+    while True:
+        data = b''
+        resp = b'MSG'
+        try:
+            data = get_data(connection, 4096)
+        except Exception as e:
+            resp += b'-ERECV'
+            logging.exception('recv error', e)
+        else:
+            try:
+                process_articles(json.loads(data.decode('utf-8')))
+                resp += b'-OK'
+            except json.JSONDecodeError:
+                resp += b'-EJSON'
+                logging.warning('bad json')
+            except Exception as e:
+                resp += b'-EUNKNOWN'
+                logging.error('unknown error', e)
+
+        resp += b'-DONE'
+        connection.sendall(add_length_header(resp))
+        retry = connection.recv(4)
+
+        if not retry:
+            logging.warning(f'Client closed unexpectedly. data=\n{data}')
+        elif retry == b'DONE':
+            logging.debug('Client done sending messages.')
+        elif retry in {b'NEXT', b'REDO'}:
+            continue
+        else:
+            logging.warning(f'Client send unexpected reply: {retry}')
+        break
+    connection.close()
+
+
+def main():
     server_address = './uds_socket'
 
     try:
@@ -107,8 +168,13 @@ if __name__ == "__main__":
         sock.bind(server_address)
         sock.listen(1)
 
-        while True:
-            connection, client_address = sock.accept()
-            print(f"accepted connection from {client_address}")
-            ct = Thread(target=handle_connection, args=(connection,))
-            ct.start()
+        # while True:
+        connection, client_address = sock.accept()
+        print(f"accepted connection from {client_address}")
+        handle_connection(connection)
+        # ct = Thread(target=handle_connection, args=(connection,))
+        # ct.start()
+
+
+if __name__ == "__main__":
+    main()
