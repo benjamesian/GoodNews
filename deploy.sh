@@ -47,9 +47,9 @@ deploy::upload()
   tee >(cat - >&2) | ssh -T -- "ubuntu@$1"
   scp -- "${WORKDIR}/${RELEASE}.tar.gz" "ubuntu@$1:/data/releases"
 } << EOF
-sudo --non-interactive mkdir -m 0755 /data
-sudo --non-interactive mkdir -m 0755 /data/releases
-sudo --non-interactive chown -R ubuntu:ubuntu /data
+sudo --non-interactive mkdir -pm 0755 /data
+sudo --non-interactive mkdir -pm 0755 /data/releases
+sudo --non-interactive chown -hR ubuntu:ubuntu /data
 exit
 EOF
 
@@ -61,18 +61,21 @@ deploy::install()
 } << EOF
 cd /data/releases
 tar -xzf '${RELEASE/\'/\'\\\'\'}.tar.gz'
-sudo --non-interactive chown -R ubuntu:ubuntu '${RELEASE/\'/\'\\\'\'}'
+sudo --non-interactive chown -R ubuntu:ubuntu -- '${RELEASE/\'/\'\\\'\'}'
+cp -LpR -- /data/current '${RELEASE/\'/\'\\\'\'}.old'
 rm -fr /data/current
-mkdir -m 0755 /data/current
+tar -czf '${RELEASE/\'/\'\\\'\'}.old.tar.gz' -- '${RELEASE/\'/\'\\\'\'}.old'
+rm -fr -- '${RELEASE/\'/\'\\\'\'}.old'
+mkdir -pm 0755 /data/current
 cd /data/current
 ln -s '../releases/${RELEASE/\'/\'\\\'\'}'/* .
 printf '%s\0' manifests/*.pp |
-  xargs --null --verbose --max-args=1 sudo --non-interactive puppet apply
+  xargs -n 1 --null --verbose sudo --non-interactive puppet apply
 exit
 EOF
 
 # Locally archive a current copy of the project repo
-printf 'Creating local archive %s\n' "${RELEASE}"
+echo 'Creating local archive'
 deploy::archive | tee -a "${LOGFILE}"
 echo
 
