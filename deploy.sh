@@ -63,7 +63,7 @@ cd /data/releases
 tar -xzf '${RELEASE/\'/\'\\\'\'}.tar.gz'
 sudo --non-interactive chown -R ubuntu:ubuntu '${RELEASE/\'/\'\\\'\'}'
 rm -fr /data/current
-mkdir -p 0755 /data/current
+mkdir -m 0755 /data/current
 cd /data/current
 ln -s '../releases/${RELEASE/\'/\'\\\'\'}'/* .
 printf '%s\0' manifests/*.pp |
