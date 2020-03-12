@@ -66,10 +66,8 @@ rm -fr /data/current
 mkdir -p 0755 /data/current
 cd /data/current
 ln -s '../releases/${RELEASE/\'/\'\\\'\'}'/* .
-for file in manifests/*.pp
-do
-  sudo --non-interactive puppet apply -- '{}' ';'
-done
+printf '%s\0' manifests/*.pp |
+  xargs --null --verbose --max-args=1 sudo --non-interactive puppet apply
 exit
 EOF
 

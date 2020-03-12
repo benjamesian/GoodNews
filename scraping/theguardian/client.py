@@ -4,7 +4,7 @@ Provides a client to request articles from the Guardian API
 """
 import json
 import requests
-from scraping import LOGGER
+import scraping
 from scraping.base.client import Client as BaseClient
 from scraping.theguardian import API, AUTH_FILE, DATA_FILE
 
@@ -43,7 +43,7 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
         Format the most recent response
         """
         try:
-            LOGGER.info('Preparing results from The Guardian API...')
+            scraping.LOGGER.info('Preparing results from The Guardian API...')
             return [{
                 'url': item.get('webUrl'),
                 'title': item.get('webTitle'),
@@ -52,29 +52,30 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
                 'picture_url': item.get('fields', {}).get('thumbnail'),
             } for item in self.data['response']['results']]
         except KeyError as exc:
-            LOGGER.warning('KeyError: %s', ', '.join(map(str, exc.args)))
+            scraping.LOGGER.warning(
+                'KeyError: %s', ', '.join(map(str, exc.args)))
             return []
 
     def request(self):
         """
         Request articles from The Guardian API
         """
-        LOGGER.info('Requesting news from The Guardian...')
+        scraping.LOGGER.info('Requesting news from The Guardian...')
         params = {
             'format': 'json',
             'show-fields': 'byline,headline,standfirst,thumbnail',
             'api-key': self.auth.get('api-key'),
             'from-date': self.data.get('timestamp'),
         }
-        LOGGER.debug('Sending request to %s', self.api_url)
+        scraping.LOGGER.debug('Sending request to %s', self.api_url)
         resp = requests.get(self.api_url, params=params)
-        LOGGER.info('Response status %d', resp.status_code)
+        scraping.LOGGER.info('Response status %d', resp.status_code)
         if 200 <= resp.status_code < 300:
             self.data = resp.json()
             self.data['timestamp'] = self.timestamp()
             with open(self.data_file, 'w') as ostream:
                 json.dump(self.data, ostream)
-            LOGGER.info('Wrote json to %s', self.data_file)
+            scraping.LOGGER.info('Wrote json to %s', self.data_file)
         return resp.status_code
 
 

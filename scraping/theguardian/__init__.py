@@ -4,6 +4,7 @@ Provides a module to collect news from The Guardian
 """
 import os
 import pathlib
+import scraping
 
 API = 'https://content.guardianapis.com'
 AUTH_FILE = os.getenv(
