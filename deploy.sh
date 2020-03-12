@@ -40,7 +40,7 @@ deploy::archive()
   set -o verbose
   rsync -a --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "${WORKDIR}/${RELEASE}"
   tar -czf "${WORKDIR}/${RELEASE}.tar.gz" -C "${WORKDIR}" -- "${RELEASE}"
-} > /dev/null
+}
 
 # Define a function to upload a release to a single host
 # usage: deploy::upload USER@HOST
@@ -72,7 +72,8 @@ exit
 EOF
 
 # Locally archive a current copy of the project repo
-deploy::archive
+deploy::archive &> "${WORKDIR}/0.output"
+cat -- "${WORKDIR}"/0.output
 
 # Upload to hosts in parallel with a separate log for each
 printf 'Uploading to:\n'
@@ -81,10 +82,10 @@ do
   printf '%s\n' "${!INDEX}"
   { printf '%s: %s\n' "$(date '+%c')" "${!INDEX}"
     (deploy::upload "${!INDEX}") &
-  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").0.output"
+  } &> "${WORKDIR}/1.$(printf "%0${##}d" "${INDEX}").output"
 done
 wait
-cat -- "${WORKDIR}"/*.0.output
+cat -- "${WORKDIR}"/1.*.output
 
 # Install on hosts in parallel with a separate log for each
 printf 'Installing on:\n'
@@ -93,10 +94,10 @@ do
   printf '%s\n' "${!INDEX}"
   { printf '%s: %s\n' "$(date '+%c')" "${!INDEX}"
     (deploy::install "${!INDEX}") &
-  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").1.output"
+  } &> "${WORKDIR}/2.$(printf "%0${##}d" "${INDEX}").output"
 done
 wait
-cat -- "${WORKDIR}"/*.1.output
+cat -- "${WORKDIR}"/2.*.output
 
 # Append to master log
 cat -- "${WORKDIR}"/*.output >> "${LOGFILE}"

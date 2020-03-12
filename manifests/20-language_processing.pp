@@ -9,18 +9,12 @@ service {'language_processing.service':
 
 file {'language_processing.service':
   ensure => file,
-  path   => '/etc/systemd/system/language_processing.service',
-  source => '/data/current/etc/systemd/system/language_processing.service',
   mode   => '0644',
   owner  => 'root',
   group  => 'root',
+  path   => '/etc/systemd/system/language_processing.service',
+  source => '/data/current/etc/systemd/system/language_processing.service',
   notify => Exec['daemon-reload'],
-}
-
-exec {'restart':
-  command => 'systemctl restart language_processing.service',
-  path    => '/usr/bin:/bin',
-  require => Service['language_processing.service'],
 }
 
 exec {'daemon-reload':
