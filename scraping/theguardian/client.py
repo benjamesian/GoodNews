@@ -14,6 +14,7 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
     """
     auth_file = AUTH_FILE
     data_file = DATA_FILE
+    name = 'TheGuardian'
     url = '/'.join([API, 'search'])
 
     # pylint: disable=super-init-not-called
