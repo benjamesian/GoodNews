@@ -36,11 +36,11 @@ set +o errexit    # Setup complete.
 # usage: deploy::archive
 deploy::archive()
 {
-  local -
-  set -o verbose
-  rsync -a --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "${WORKDIR}/${RELEASE}"
-  tar -czf "${WORKDIR}/${RELEASE}.tar.gz" -C "${WORKDIR}" -- "${RELEASE}"
-}
+  tee >(cat - >&2) | bash
+} << EOF
+rsync -a --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "${WORKDIR}/${RELEASE}"
+tar -czf "${WORKDIR}/${RELEASE}.tar.gz" -C "${WORKDIR}" -- "${RELEASE}"
+EOF
 
 # Define a function to upload a release to a single host
 # usage: deploy::upload USER@HOST
@@ -49,7 +49,7 @@ deploy::upload()
   tee >(cat - >&2) | ssh -T -- "ubuntu@$1"
   scp -- "${WORKDIR}/${RELEASE}.tar.gz" "ubuntu@$1:/data/releases"
 } << EOF
-sudo --non-interactive mkdir -p /data/releases
+sudo --non-interactive mkdir -p /data/current /data/releases
 sudo --non-interactive chown -R ubuntu:ubuntu /data
 exit
 EOF
@@ -63,15 +63,16 @@ deploy::install()
 cd /data/releases
 tar -xzf '${RELEASE/\'/\'\\\'\'}.tar.gz'
 sudo --non-interactive chown -R ubuntu:ubuntu '${RELEASE/\'/\'\\\'\'}'
-cd /data
-rm -fr current
-ln -s 'releases/${RELEASE/\'/\'\\\'\'}' current
+cd /data/current
+rm -fr *
+ln -s '/data/releases/${RELEASE/\'/\'\\\'\'}'/* .
 find /data/current/manifests -maxdepth 1 -name '*.pp' -type f -execdir \
   sudo --non-interactive puppet apply -- '{}' ';'
 exit
 EOF
 
 # Locally archive a current copy of the project repo
+# shellcheck disable=SC2154
 deploy::archive &> "${WORKDIR}/0.output"
 cat -- "${WORKDIR}"/0.output
 

@@ -18,7 +18,6 @@ file {'language_processing.service':
 }
 
 exec {'daemon-reload':
-  command     => 'systemctl daemon-reload',
-  path        => '/usr/bin:/bin',
-  refreshonly => true,
+  command => 'systemctl daemon-reload',
+  path    => '/usr/bin:/bin',
 }
