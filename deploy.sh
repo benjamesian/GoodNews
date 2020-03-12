@@ -18,34 +18,39 @@ then
   set -o verbose -o xtrace
 fi
 
-declare -A TARGETS
-TARGETS=(
-  [web-01]=35.196.167.155
-  [web-02]=34.73.252.236
-)
-set -- "${!TARGETS[@]}"
+if ! (( $# ))
+then
+  set -- '35.196.167.155' '34.73.252.236'
+fi
 
 PROJECT="$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)"
 RELEASE="${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')"
 LOGFILE="${PROJECT}/deploy.log"
 EXCLUDE="${PROJECT}/deploy.ignore"
-DESTDIR="/data/releases/${RELEASE}"
-
 WORKDIR="$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")"
 trap 'rm -rf -- "${WORKDIR}"' EXIT
 
 set +o errexit    # Setup complete.
 
+# Define a function to make a local archive of a release
+# usage: deploy::archive
+deploy::archive()
+{
+  local -
+  set -o verbose
+  rsync -a --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "${WORKDIR}/${RELEASE}"
+  tar -czf "${WORKDIR}/${RELEASE}.tar.gz" -C "${WORKDIR}" -- "${RELEASE}"
+} > /dev/null
+
 # Define a function to upload a release to a single host
 # usage: deploy::upload USER@HOST
 deploy::upload()
 {
-  ssh -t -- "$1"
-  rsync -az --stats --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "$1:${DESTDIR}"
+  tee >(cat - >&2) | ssh -T -- "ubuntu@$1"
+  scp -- "${WORKDIR}/${RELEASE}.tar.gz" "ubuntu@$1:/data/releases"
 } << EOF
-set -o errexit
 sudo --non-interactive mkdir -p /data/releases
-sudo --non-interactive chown -R '${1%%@*}:${1%%@*}' /data
+sudo --non-interactive chown -R ubuntu:ubuntu /data
 exit
 EOF
 
@@ -53,40 +58,45 @@ EOF
 # usage: deploy::install USER@HOST
 deploy::install()
 {
-  ssh -t -- "$1"
+  tee >(cat - >&2) | ssh -T -- "ubuntu@$1"
 } << EOF
-set -o errexit
-sudo --non-interactive chown -R '${1%%@*}:${1%%@*}' '${DESTDIR/\'/\'\\\'\'}'
-rm -fr /data/current
-ln -s -- '${DESTDIR/\'/\'\\\'\'}' /data/current
+cd /data/releases
+tar -xzf '${RELEASE/\'/\'\\\'\'}.tar.gz'
+sudo --non-interactive chown -R ubuntu:ubuntu '${RELEASE/\'/\'\\\'\'}'
+cd /data
+rm -fr current
+ln -s 'releases/${RELEASE/\'/\'\\\'\'}' current
 find /data/current/manifests -maxdepth 1 -name '*.pp' -type f -execdir \
   sudo --non-interactive puppet apply -- '{}' ';'
 exit
 EOF
 
+# Locally archive a current copy of the project repo
+deploy::archive
+
 # Upload to hosts in parallel with a separate log for each
-echo 'Uploading...'
+printf 'Uploading to:\n'
 for (( INDEX = 1; INDEX <= $#; ++INDEX ))
 do
-  # shellcheck disable=SC2183
-  { printf '%s: %s [%s]\n' "$(date '+%c')" "${!INDEX}" "${TARGETS[${!INDEX}]}"
-    (deploy::upload "ubuntu@${TARGETS[${!INDEX}]}") &
-  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").0.log"
+  printf '%s\n' "${!INDEX}"
+  { printf '%s: %s\n' "$(date '+%c')" "${!INDEX}"
+    (deploy::upload "${!INDEX}") &
+  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").0.output"
 done
 wait
-cat -- "${WORKDIR}"/*.0.log
+cat -- "${WORKDIR}"/*.0.output
 
 # Install on hosts in parallel with a separate log for each
-echo 'Installing...'
+printf 'Installing on:\n'
 for (( INDEX = 1; INDEX <= $#; ++INDEX ))
 do
-  # shellcheck disable=SC2183
-  { printf '%s: %s [%s]\n' "$(date '+%c')" "${!INDEX}" "${TARGETS[${!INDEX}]}"
-    (deploy::install "ubuntu@${TARGETS[${!INDEX}]}") &
-  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").1.log"
+  printf '%s\n' "${!INDEX}"
+  { printf '%s: %s\n' "$(date '+%c')" "${!INDEX}"
+    (deploy::install "${!INDEX}") &
+  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").1.output"
 done
 wait
-cat -- "${WORKDIR}"/*.1.log
+cat -- "${WORKDIR}"/*.1.output
 
 # Append to master log
-cat -- "${WORKDIR}"/*.log >> "${LOGFILE}"
+cat -- "${WORKDIR}"/*.output >> "${LOGFILE}"
