@@ -9,13 +9,16 @@ import scraping
 
 
 def accept_status(status: bytes) -> bool:
-    '''Check if the server status is OK'''
+    """
+    Check if the server status is OK
+    """
     if status == b'MSG-OK-DONE':
         return True
 
     if not status:
         raise InterruptedError('Server closed unexpectedly')
-    elif not status.startswith(b'MSG-'):
+
+    if not status.startswith(b'MSG-'):
         print(f'Unexpected response start: {status}', sys.stderr)
     elif not status.endswith(b'-DONE'):
         print(f'Unexpected response finish: {status}', file=sys.stderr)
@@ -36,12 +39,18 @@ def accept_status(status: bytes) -> bool:
 
 
 def add_length_header(data: bytes) -> bytes:
+    """
+    Add padding to a packet
+    """
     length = str(len(data)).encode()
     header = (b'<length ' + length + b'>').ljust(32)
     return header + data
 
 
 def consume_length_header(connection: socket.socket) -> int:
+    """
+    Ingest a packet
+    """
     raw_header = connection.recv(32)
     content_length = raw_header.strip(b'<length> ')
     return int(content_length)

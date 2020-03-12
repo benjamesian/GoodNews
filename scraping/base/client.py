@@ -11,8 +11,8 @@ class Client(ABC):  # pylint: disable=too-few-public-methods
     """
     Definition of a class to retrieve news from a news source
     """
-    name: str
-    url: str
+    name: str = None
+    api_url: str = None
 
     @abstractmethod
     def results(self) -> List[dict]:

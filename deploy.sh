@@ -4,25 +4,22 @@
 # For each server:
 # 1. Copy a snapshot to the server's `releases' directory.
 # 2. Link the snapshot in the `current' release directory.
-# 3. Install unmet dependencies (i.e. `pip', `apt').
 # 4. Apply configuration via puppet manifests.
 ########################################################
 
 # Set up the environment.
 
-set -o errexit    # If an error occurs during setup, exit.
+set -o errexit    # If an error occurs, exit.
 
-if [[ -v DEBUG ]] # Enable debugging output.
+if [[ -v DEBUG ]] # Enable debugging output if `DEBUG' is defined.
 then
   exec {BASH_XTRACEFD}>&2
   set -o verbose -o xtrace
 fi
-
-if ! (( $# ))
+if ! (( $# ))     # Set remote targets if none were supplied as arguments.
 then
   set -- '35.196.167.155' '34.73.252.236'
 fi
-
 PROJECT="$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)"
 RELEASE="${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')"
 LOGFILE="${PROJECT}/deploy.log"
@@ -30,7 +27,7 @@ EXCLUDE="${PROJECT}/deploy.ignore"
 WORKDIR="$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")"
 trap 'rm -rf -- "${WORKDIR}"' EXIT
 
-set +o errexit    # Setup complete.
+set +o errexit    # Environemnt setup complete.
 
 # Define a function to make a local archive of a release
 # usage: deploy::archive
@@ -40,22 +37,24 @@ deploy::archive()
 } << EOF
 rsync -a --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "${WORKDIR}/${RELEASE}"
 tar -czf "${WORKDIR}/${RELEASE}.tar.gz" -C "${WORKDIR}" -- "${RELEASE}"
+exit
 EOF
 
 # Define a function to upload a release to a single host
-# usage: deploy::upload USER@HOST
+# usage: deploy::upload HOST
 deploy::upload()
 {
   tee >(cat - >&2) | ssh -T -- "ubuntu@$1"
   scp -- "${WORKDIR}/${RELEASE}.tar.gz" "ubuntu@$1:/data/releases"
 } << EOF
-sudo --non-interactive mkdir -p /data/current /data/releases
+sudo --non-interactive mkdir -m 0755 /data
+sudo --non-interactive mkdir -m 0755 /data/releases
 sudo --non-interactive chown -R ubuntu:ubuntu /data
 exit
 EOF
 
 # Define a function to install a release on a single host
-# usage: deploy::install USER@HOST
+# usage: deploy::install HOST
 deploy::install()
 {
   tee >(cat - >&2) | ssh -T -- "ubuntu@$1"
@@ -63,42 +62,42 @@ deploy::install()
 cd /data/releases
 tar -xzf '${RELEASE/\'/\'\\\'\'}.tar.gz'
 sudo --non-interactive chown -R ubuntu:ubuntu '${RELEASE/\'/\'\\\'\'}'
+rm -fr /data/current
+mkdir -p 0755 /data/current
 cd /data/current
-rm -fr *
-ln -s '/data/releases/${RELEASE/\'/\'\\\'\'}'/* .
-find -L /data/current/manifests -maxdepth 1 -name '*.pp' -type f -execdir \
+ln -s '../releases/${RELEASE/\'/\'\\\'\'}'/* .
+for file in manifests/*.pp
+do
   sudo --non-interactive puppet apply -- '{}' ';'
+done
 exit
 EOF
 
 # Locally archive a current copy of the project repo
-# shellcheck disable=SC2154
-deploy::archive &> "${WORKDIR}/0.output"
-cat -- "${WORKDIR}"/0.output
+printf 'Creating local archive %s\n' "${RELEASE}"
+deploy::archive | tee -a "${LOGFILE}"
+echo
 
 # Upload to hosts in parallel with a separate log for each
-printf 'Uploading to:\n'
+echo
 for (( INDEX = 1; INDEX <= $#; ++INDEX ))
 do
-  printf '%s\n' "${!INDEX}"
+  printf 'Releaseing archive to %s\n' "${!INDEX}"
   { printf '%s: %s\n' "$(date '+%c')" "${!INDEX}"
     (deploy::upload "${!INDEX}") &
-  } &> "${WORKDIR}/1.$(printf "%0${##}d" "${INDEX}").output"
+  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").logfile"
 done
 wait
-cat -- "${WORKDIR}"/1.*.output
+cat -- "${WORKDIR}"/*.logfile | tee -a "${LOGFILE}"
 
 # Install on hosts in parallel with a separate log for each
-printf 'Installing on:\n'
+echo
 for (( INDEX = 1; INDEX <= $#; ++INDEX ))
 do
-  printf '%s\n' "${!INDEX}"
+  printf 'Installing release on %s\n' "${!INDEX}"
   { printf '%s: %s\n' "$(date '+%c')" "${!INDEX}"
     (deploy::install "${!INDEX}") &
-  } &> "${WORKDIR}/2.$(printf "%0${##}d" "${INDEX}").output"
+  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").logfile"
 done
 wait
-cat -- "${WORKDIR}"/2.*.output
-
-# Append to master log
-cat -- "${WORKDIR}"/*.output >> "${LOGFILE}"
+cat -- "${WORKDIR}"/*.logfile | tee -a "${LOGFILE}"
