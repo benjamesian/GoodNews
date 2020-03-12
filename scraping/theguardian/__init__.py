@@ -8,9 +8,9 @@ import pathlib
 API = 'https://content.guardianapis.com'
 AUTH_FILE = os.getenv(
     'GOOD_NEWS_THE_GUARDIAN_AUTH_FILE',
-    str(pathlib.Path(__file__).parent.joinpath('auth.json'))
+    os.path.join(os.path.dirname(__file__), 'auth.json')
 )
 DATA_FILE = os.getenv(
     'GOOD_NEWS_THE_GUARDIAN_AUTH_FILE',
-    str(pathlib.Path(__file__).parent.joinpath('data.json'))
+    os.path.join(os.path.dirname(__file__), 'data.json')
 )

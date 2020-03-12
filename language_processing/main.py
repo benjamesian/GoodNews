@@ -7,12 +7,17 @@ import requests
 import socket
 from threading import Thread
 
-
-URL_LOGIN = 'https://34.73.94.209/admin/'
-URL_ENDPOINT = 'https://34.73.94.209/'
+# 34.73.94.209
+URL_LOGIN = 'http://35.196.167.155:5000/admin/'
+URL_ENDPOINT = 'http://35.196.167.155/'
 
 USERNAME = os.getenv('GOOD_NEWS_USERNAME')
 PASSWORD = os.getenv('GOOD_NEWS_PASSWORD')
+
+# ips = {
+#     '801-web-01': '35.196.167.155',
+#     '801-web-02': '34.73.252.236'
+# }
 
 
 def add_articles(articles):
@@ -28,11 +33,12 @@ def add_articles(articles):
                           next='/')
         session.post(URL_LOGIN, data=login_data,
                      headers=dict(Referer=URL_LOGIN))
+
         session.headers.update({
             'content-type': 'application/json',
             'X-CSRFToken': session.cookies.get('csrftoken')
         })
-
+        print('posting', articles)
         session.post(URL_ENDPOINT, data=json.dumps(articles))
 
 
@@ -114,12 +120,12 @@ def get_data(connection: socket.socket, chunksize: int = 4096) -> bytes:
 
 
 def handle_connection(connection: socket.socket):
-    data = b''
-    resp = b'MSG'
     while True:
+        data = b''
+        resp = b'MSG'
         try:
             data = get_data(connection, 4096)
-        except Exception:
+        except Exception as e:
             resp += b'-ERECV'
             logging.exception('recv error', e)
         else:
@@ -132,23 +138,24 @@ def handle_connection(connection: socket.socket):
             except Exception as e:
                 resp += b'-EUNKNOWN'
                 logging.error('unknown error', e)
-        finally:
-            resp += b'-DONE'
-            connection.sendall(add_length_header(resp))
-            retry = connection.recv(4)
-            if not retry:
-                logging.warning('Client closed unexpectedly. data=\n{data}')
-            elif retry == b'DONE':
-                logging.debug('Client done sending messages.')
-            elif retry == b'NEXT':
-                continue
-            else:
-                logging.warning(f'Client send unexpected reply: {retry}')
-            break
+
+        resp += b'-DONE'
+        connection.sendall(add_length_header(resp))
+        retry = connection.recv(4)
+
+        if not retry:
+            logging.warning(f'Client closed unexpectedly. data=\n{data}')
+        elif retry == b'DONE':
+            logging.debug('Client done sending messages.')
+        elif retry in {b'NEXT', b'REDO'}:
+            continue
+        else:
+            logging.warning(f'Client send unexpected reply: {retry}')
+        break
     connection.close()
 
 
-if __name__ == "__main__":
+def main():
     server_address = './uds_socket'
 
     try:
@@ -167,3 +174,7 @@ if __name__ == "__main__":
         handle_connection(connection)
         # ct = Thread(target=handle_connection, args=(connection,))
         # ct.start()
+
+
+if __name__ == "__main__":
+    main()

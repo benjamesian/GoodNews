@@ -58,25 +58,29 @@ def main():
                 articles = client.results()
                 print(articles, file=sys.stderr)
 
+                send_json = b''
                 try:
-                    send_data = json.dumps(articles).encode()
+                    send_json = json.dumps(articles).encode()
                 except json.JSONDecodeError:
-                    print(f'Got bad json from {client.name}\n{send_data}',
+                    print(f'Got bad json from {client.name}\n{send_json}',
                           file=sys.stderr)
                     continue
+                send_data = add_length_header(send_json)
 
                 max_attempts = 3
-                while max_attempts > 0:
-                    sock.sendall(add_length_header(send_data))
+                while True:
+                    sock.sendall(send_data)
                     status_length = consume_length_header(sock)
                     status = sock.recv(status_length)
 
-                    if accept_status(status):
-                        break
                     max_attempts -= 1
+                    if accept_status(status) or max_attempts <= 0:
+                        break
+
+                    sock.sendall(b'REDO')
 
                 if max_attempts == 0:
-                    print(f'Failed too many times, data=\n{send_data}',
+                    print(f'Failed too many times, data=\n{send_json}',
                           sys.stderr)
                 if i < len(scraping.API_CLIENTS) - 1:
                     sock.sendall(b'NEXT')
