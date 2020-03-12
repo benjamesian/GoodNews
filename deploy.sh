@@ -66,7 +66,7 @@ sudo --non-interactive chown -R ubuntu:ubuntu '${RELEASE/\'/\'\\\'\'}'
 cd /data/current
 rm -fr *
 ln -s '/data/releases/${RELEASE/\'/\'\\\'\'}'/* .
-find /data/current/manifests -maxdepth 1 -name '*.pp' -type f -execdir \
+find -L /data/current/manifests -maxdepth 1 -name '*.pp' -type f -execdir \
   sudo --non-interactive puppet apply -- '{}' ';'
 exit
 EOF

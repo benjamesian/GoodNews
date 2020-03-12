@@ -10,7 +10,7 @@ service {'scraping.service':
 service {'scraping.timer':
   ensure    => running,
   enable    => true,
-  require   => [File['scraping.timer'], Service['scraping.service']],
+  require   => [File['scraping.timer'], File['scraping.service']],
   subscribe => Exec['daemon-reload'],
 }
 
