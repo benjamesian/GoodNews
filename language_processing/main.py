@@ -1,11 +1,11 @@
+'''call language processing service and post results to site'''
 import json
-from language_processing.ibmcloud.ibmcloud import get_sentiments
 import logging
 from multiprocessing import Pool
 import os
-import requests
 import socket
-from threading import Thread
+import requests
+from language_processing.ibmcloud.ibmcloud import get_sentiments
 
 # 34.73.94.209
 URL_LOGIN = 'http://35.196.167.155:5000/admin/'
@@ -49,6 +49,7 @@ def get_batch_sentiments(articles):
 
 
 def process_articles(articles):
+    '''perform processing on multiple articles and get results'''
     article_titles = map(lambda x: x.get('title', ''), articles)
     raw_sentiments = get_batch_sentiments(article_titles)
     raw_sentiments = [
@@ -96,18 +97,21 @@ def process_articles(articles):
 #     return data
 
 def add_length_header(data: bytes) -> bytes:
+    '''add header indicating message length'''
     length = str(len(data)).encode()
     header = (b'<length ' + length + b'>').ljust(32)
     return header + data
 
 
 def consume_length_header(connection: socket.socket) -> int:
+    '''consume a length header and return length value'''
     raw_header = connection.recv(32)
     content_length = raw_header.strip(b'<length> ')
     return int(content_length)
 
 
 def get_data(connection: socket.socket, chunksize: int = 4096) -> bytes:
+    '''get data from a message with a length header'''
     bytes_remaining = consume_length_header(connection)
 
     data = b''
@@ -120,14 +124,15 @@ def get_data(connection: socket.socket, chunksize: int = 4096) -> bytes:
 
 
 def handle_connection(connection: socket.socket):
+    '''communicate with a scraper'''
     while True:
         data = b''
         resp = b'MSG'
         try:
             data = get_data(connection, 4096)
-        except Exception as e:
+        except OSError as err:
             resp += b'-ERECV'
-            logging.exception('recv error', e)
+            logging.exception('recv error: %s', err)
         else:
             try:
                 process_articles(json.loads(data.decode('utf-8')))
@@ -135,27 +140,28 @@ def handle_connection(connection: socket.socket):
             except json.JSONDecodeError:
                 resp += b'-EJSON'
                 logging.warning('bad json')
-            except Exception as e:
+            except OSError as err:
                 resp += b'-EUNKNOWN'
-                logging.error('unknown error', e)
+                logging.error('unknown error: %s', err)
 
         resp += b'-DONE'
         connection.sendall(add_length_header(resp))
         retry = connection.recv(4)
 
         if not retry:
-            logging.warning(f'Client closed unexpectedly. data=\n{data}')
+            logging.warning('Client closed unexpectedly. data=\n%s', data)
         elif retry == b'DONE':
             logging.debug('Client done sending messages.')
         elif retry in {b'NEXT', b'REDO'}:
             continue
         else:
-            logging.warning(f'Client send unexpected reply: {retry}')
+            logging.warning('Client send unexpected reply: %s', retry)
         break
     connection.close()
 
 
 def main():
+    '''listen for input from a socket'''
     server_address = './uds_socket'
 
     try:
