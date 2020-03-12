@@ -9,11 +9,11 @@ service {'goodnews.service':
 
 file {'goodnews.service':
   ensure => file,
-  path   => '/etc/systemd/system/goodnews.service',
-  source => '/data/current/etc/systemd/system/goodnews.service',
   mode   => '0644',
   owner  => 'root',
   group  => 'root',
+  path   => '/etc/systemd/system/goodnews.service',
+  source => '/data/current/etc/systemd/system/goodnews.service',
   notify => Exec['daemon-reload'],
 }
 

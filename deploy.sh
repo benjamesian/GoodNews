@@ -36,11 +36,11 @@ set +o errexit    # Setup complete.
 # usage: deploy::archive
 deploy::archive()
 {
-  local -
-  set -o verbose
-  rsync -a --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "${WORKDIR}/${RELEASE}"
-  tar -czf "${WORKDIR}/${RELEASE}.tar.gz" -C "${WORKDIR}" -- "${RELEASE}"
-} > /dev/null
+  tee >(cat - >&2) | bash
+} << EOF
+rsync -a --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "${WORKDIR}/${RELEASE}"
+tar -czf "${WORKDIR}/${RELEASE}.tar.gz" -C "${WORKDIR}" -- "${RELEASE}"
+EOF
 
 # Define a function to upload a release to a single host
 # usage: deploy::upload USER@HOST
@@ -49,7 +49,7 @@ deploy::upload()
   tee >(cat - >&2) | ssh -T -- "ubuntu@$1"
   scp -- "${WORKDIR}/${RELEASE}.tar.gz" "ubuntu@$1:/data/releases"
 } << EOF
-sudo --non-interactive mkdir -p /data/releases
+sudo --non-interactive mkdir -p /data/current /data/releases
 sudo --non-interactive chown -R ubuntu:ubuntu /data
 exit
 EOF
@@ -63,16 +63,18 @@ deploy::install()
 cd /data/releases
 tar -xzf '${RELEASE/\'/\'\\\'\'}.tar.gz'
 sudo --non-interactive chown -R ubuntu:ubuntu '${RELEASE/\'/\'\\\'\'}'
-cd /data
-rm -fr current
-ln -s 'releases/${RELEASE/\'/\'\\\'\'}' current
-find /data/current/manifests -maxdepth 1 -name '*.pp' -type f -execdir \
+cd /data/current
+rm -fr *
+ln -s '/data/releases/${RELEASE/\'/\'\\\'\'}'/* .
+find -L /data/current/manifests -maxdepth 1 -name '*.pp' -type f -execdir \
   sudo --non-interactive puppet apply -- '{}' ';'
 exit
 EOF
 
 # Locally archive a current copy of the project repo
-deploy::archive
+# shellcheck disable=SC2154
+deploy::archive &> "${WORKDIR}/0.output"
+cat -- "${WORKDIR}"/0.output
 
 # Upload to hosts in parallel with a separate log for each
 printf 'Uploading to:\n'
@@ -81,10 +83,10 @@ do
   printf '%s\n' "${!INDEX}"
   { printf '%s: %s\n' "$(date '+%c')" "${!INDEX}"
     (deploy::upload "${!INDEX}") &
-  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").0.output"
+  } &> "${WORKDIR}/1.$(printf "%0${##}d" "${INDEX}").output"
 done
 wait
-cat -- "${WORKDIR}"/*.0.output
+cat -- "${WORKDIR}"/1.*.output
 
 # Install on hosts in parallel with a separate log for each
 printf 'Installing on:\n'
@@ -93,10 +95,10 @@ do
   printf '%s\n' "${!INDEX}"
   { printf '%s: %s\n' "$(date '+%c')" "${!INDEX}"
     (deploy::install "${!INDEX}") &
-  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").1.output"
+  } &> "${WORKDIR}/2.$(printf "%0${##}d" "${INDEX}").output"
 done
 wait
-cat -- "${WORKDIR}"/*.1.output
+cat -- "${WORKDIR}"/2.*.output
 
 # Append to master log
 cat -- "${WORKDIR}"/*.output >> "${LOGFILE}"
