@@ -31,11 +31,11 @@ ALLOWED_HOSTS = [
     '35.196.167.155',
     '34.73.252.236',
     '34.73.94.209',
-    'thefunk.tech'
-    'lb-01.thefunk.tech'
-    'web-01.thefunk.tech'
-    'web-02.thefunk.tech'
-    'www.thefunk.tech'
+    'thefunk.tech',
+    'lb-01.thefunk.tech',
+    'web-01.thefunk.tech',
+    'web-02.thefunk.tech',
+    'www.thefunk.tech',
 ]
 
 
