@@ -7,8 +7,6 @@ User=ubuntu
 Group=www-data
 WorkingDirectory=/data/current
 Environment=GOOD_NEWS_IBM_CLOUD_API_KEY=bj0gTWmYfHV03xyqZ-nnzZSQhQzMNADgwbttOH9NTWuS
-Environment=GOOD_NEWS_USERNAME=admin
-Environment=GOOD_NEWS_PASSWORD=adminPassword
 Environment=GOOD_NEWS_API_HOST=localhost
 Environment=GOOD_NEWS_API_SCHEMA=http
 ExecStart=/usr/bin/python3.6 -m language_processing.main
