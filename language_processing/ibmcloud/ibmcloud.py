@@ -4,7 +4,7 @@ import json
 import requests
 
 with open('/data/current/credentials/goodnews-ibm-credentials.json') as cred_file:
-    CREDENTIALS = json.loads(cred_file)
+    CREDENTIALS = json.load(cred_file)
     API_KEY = CREDENTIALS['apikey2']
 URL = ("https://api.us-south.tone-analyzer.watson.cloud.ibm.com"
        "/instances/0a8e6873-8e98-4aa7-a559-90114da2c819"
