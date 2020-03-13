@@ -17,7 +17,7 @@ class IndexView(generic.ListView):
         return articles
 
     def post(self, request, *args, **kwargs):
-        """Post an article to the database."""
+        """Post articles to the database."""
         try:
             data = json.loads(request.body.decode('utf-8'))
         except json.decoder.JSONDecodeError:
