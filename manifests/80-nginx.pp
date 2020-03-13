@@ -32,3 +32,9 @@ file {'sites-enabled':
   target  => '../sites-available/GoodNews',
   require => File['sites-available'],
 }
+
+exec {'restart':
+  command => 'systemctl restart nginx.service',
+  path    => '/usr/bin:/bin',
+  require => [Service['nginx.service']],
+}

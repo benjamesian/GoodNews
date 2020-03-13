@@ -7,10 +7,11 @@ import requests
 import socket
 from threading import Thread
 
-# 34.73.94.209
-URL_LOGIN = 'http://35.196.167.155:5000/admin/'
-URL_ENDPOINT = 'http://35.196.167.155/'
-
+URL_ENDPOINT = '{}://{}'.format(
+    os.getenv('GOOD_NEWS_API_SCHEMA', 'http'),
+    os.getenv('GOOD_NEWS_API_HOST', 'localhost')
+)
+URL_LOGIN = '{}/admin'.format(URL_ENDPOINT)
 USERNAME = os.getenv('GOOD_NEWS_USERNAME')
 PASSWORD = os.getenv('GOOD_NEWS_PASSWORD')
 
@@ -49,6 +50,7 @@ def get_batch_sentiments(articles):
 
 
 def process_articles(articles):
+    """Process articles."""
     article_titles = map(lambda x: x.get('title', ''), articles)
     raw_sentiments = get_batch_sentiments(article_titles)
     raw_sentiments = [

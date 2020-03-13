@@ -4,14 +4,14 @@ service {'scraping.service':
   ensure    => stopped,
   enable    => false,
   require   => File['scraping.service'],
-  subscribe => Exec['daemon-reload'],
+  subscribe => Exec['reload'],
 }
 
 service {'scraping.timer':
   ensure    => running,
   enable    => true,
-  require   => [File['scraping.timer'], File['scraping.service']],
-  subscribe => Exec['daemon-reload'],
+  require   => [File['scraping.timer'], Service['scraping.service']],
+  subscribe => Exec['reload'],
 }
 
 file {'scraping.service':
@@ -21,7 +21,7 @@ file {'scraping.service':
   group  => 'root',
   path   => '/etc/systemd/system/scraping.service',
   source => '/data/current/etc/systemd/system/scraping.service',
-  notify => Exec['daemon-reload'],
+  notify => Exec['reload'],
 }
 
 file {'scraping.timer':
@@ -31,11 +31,16 @@ file {'scraping.timer':
   group  => 'root',
   path   => '/etc/systemd/system/scraping.timer',
   source => '/data/current/etc/systemd/system/scraping.timer',
-  notify => Exec['daemon-reload'],
+  notify => Exec['reload'],
 }
 
-exec {'daemon-reload':
-  command     => 'systemctl daemon-reload',
-  path        => '/usr/bin:/bin',
-  refreshonly => true,
+exec {'reload':
+  command => 'systemctl daemon-reload',
+  path    => '/usr/bin:/bin',
+}
+
+exec {'restart':
+  command => 'systemctl restart scraping.timer scraping.service',
+  path    => '/usr/bin:/bin',
+  require => [Exec['reload'], Service['scraping.timer'], Service['scraping.service']],
 }
