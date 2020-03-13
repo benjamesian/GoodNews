@@ -6,6 +6,7 @@ After=network.target
 User=ubuntu
 Group=www-data
 WorkingDirectory=/data/current/backend
+EnvironmentFile=/data/current/credentials/goodnews-credentials.env
 ExecStart=/usr/bin/env gunicorn --workers 3 --bind 0.0.0.0:5000 -m 007 backend.wsgi:application
 
 [Install]
