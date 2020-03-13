@@ -7,10 +7,11 @@ import socket
 import requests
 from language_processing.ibmcloud.ibmcloud import get_sentiments
 
-# 34.73.94.209
-URL_LOGIN = 'http://35.196.167.155:5000/admin/'
-URL_ENDPOINT = 'http://35.196.167.155/'
-
+URL_ENDPOINT = '{}://{}'.format(
+    os.getenv('GOOD_NEWS_API_SCHEMA', 'http'),
+    os.getenv('GOOD_NEWS_API_HOST', 'localhost')
+)
+URL_LOGIN = '{}/admin'.format(URL_ENDPOINT)
 USERNAME = os.getenv('GOOD_NEWS_USERNAME')
 PASSWORD = os.getenv('GOOD_NEWS_PASSWORD')
 

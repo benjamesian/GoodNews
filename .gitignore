@@ -1,12 +1,33 @@
-db.sqlite3
-credentials/
-migrations/
-static/
-venv/
+# blacklist temporary files
 *~
-*.py[cod]
 *.sw[op]
+
+# blacklist logs
 *.log
+
+# blacklist python bytecode
+*.py[cod]
+
+# blacklist object files
 *.so
+
+# blacklist Apple / Microsoft crap
 .DS_Store
 .vscode/
+
+# blacklist Django SQL stuff
+db.sqlite3
+migrations/
+
+# blacklist virtual environments
+venv/
+
+# blacklist sensitive credentials
+credentials/
+
+# blacklist static site files
+static/
+
+# whitelist top-level static site files
+!/www/static
+/www/static/*/

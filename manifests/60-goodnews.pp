@@ -4,7 +4,7 @@ service {'goodnews.service':
   ensure    => running,
   enable    => true,
   require   => File['goodnews.service'],
-  subscribe => Exec['daemon-reload'],
+  subscribe => Exec['reload'],
 }
 
 file {'goodnews.service':
@@ -14,11 +14,16 @@ file {'goodnews.service':
   group  => 'root',
   path   => '/etc/systemd/system/goodnews.service',
   source => '/data/current/etc/systemd/system/goodnews.service',
-  notify => Exec['daemon-reload'],
+  notify => Exec['reload'],
 }
 
-exec {'daemon-reload':
-  command     => 'systemctl daemon-reload',
-  path        => '/usr/bin:/bin',
-  refreshonly => true,
+exec {'reload':
+  command => 'systemctl daemon-reload',
+  path    => '/usr/bin:/bin',
+}
+
+exec {'restart':
+  command => 'systemctl restart nginx.service',
+  path    => '/usr/bin:/bin',
+  require => [Exec['reload'], Service['goodnews.service']],
 }

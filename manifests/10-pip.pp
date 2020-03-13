@@ -11,7 +11,7 @@ exec {'pip-upgrade':
 }
 
 exec {'pip-requirements':
-  command => 'python3 -m pip install -r /data/current/requirements.txt',
+  command => 'python3 -m pip install -U -r /data/current/requirements.txt',
   path    => '/usr/bin:/bin',
   require => Exec['pip-upgrade'],
 }
