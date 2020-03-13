@@ -12,8 +12,8 @@ URL_ENDPOINT = '{}://{}'.format(
     os.getenv('GOOD_NEWS_API_HOST', 'localhost')
 )
 URL_LOGIN = '{}/admin'.format(URL_ENDPOINT)
-# USERNAME = os.getenv('GOOD_NEWS_USERNAME')
-# PASSWORD = os.getenv('GOOD_NEWS_PASSWORD')
+USERNAME = os.getenv('GOOD_NEWS_USERNAME')
+PASSWORD = os.getenv('GOOD_NEWS_PASSWORD')
 
 # ips = {
 #     '801-web-01': '35.196.167.155',
@@ -29,18 +29,17 @@ def add_articles(articles):
             'X-CSRFToken': session.cookies.get('csrftoken')
         })
 
-        # not needed, possibly since we post from localhost
-        # login_data = dict(username=USERNAME,
-        #                   password=PASSWORD,
-        #                   next='/')
-        # session.post(URL_LOGIN, data=login_data,
-        #              headers=dict(Referer=URL_LOGIN))
+        login_data = dict(username=USERNAME,
+                          password=PASSWORD,
+                          next='/')
+        session.post(URL_LOGIN, data=login_data,
+                     headers=dict(Referer=URL_LOGIN))
 
         session.headers.update({
             'content-type': 'application/json',
             'X-CSRFToken': session.cookies.get('csrftoken')
         })
-        print('posting', articles)
+        logging.debug('posting %s', articles)
         session.post(URL_ENDPOINT, data=json.dumps(articles))
 
 
@@ -178,7 +177,7 @@ def main():
 
         while True:
             connection, client_address = sock.accept()
-            print(f"accepted connection from {client_address}")
+            logging.debug("accepted connection from %s", client_address)
             handle_connection(connection)
 
 
