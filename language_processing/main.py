@@ -131,7 +131,7 @@ def handle_connection(connection: socket.socket):
         resp = b'MSG'
         try:
             data = get_data(connection, 4096)
-        except OSError as err:
+        except (ConnectionError, OSError) as err:
             resp += b'-ERECV'
             logging.exception('recv error: %s', err)
         else:
@@ -141,7 +141,7 @@ def handle_connection(connection: socket.socket):
             except json.JSONDecodeError:
                 resp += b'-EJSON'
                 logging.warning('bad json')
-            except OSError as err:
+            except (ConnectionError, OSError) as err:
                 resp += b'-EUNKNOWN'
                 logging.error('unknown error: %s', err)
 
