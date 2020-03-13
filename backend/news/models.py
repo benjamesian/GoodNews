@@ -25,12 +25,12 @@ class ArticleSentimentTag(models.Model):
     """Intermediate model for relating corpora to sentiments"""
     corpus = models.ForeignKey(
         'Article', on_delete=models.CASCADE,
-        related_name='sentiments',
+        related_name='sentiment_tags',
         related_query_name='sentiment_tag'
     )
     sentiment = models.ForeignKey(
         Sentiment, on_delete=models.CASCADE,
-        related_name='articles',
+        related_name='article_tags',
         related_query_name='article_tag'
     )
     magnitude = models.FloatField()
@@ -59,12 +59,12 @@ class CommentSentimentTag(models.Model):
     """Intermediate model for relating corpora to sentiments"""
     corpus = models.ForeignKey(
         'Comment', on_delete=models.CASCADE,
-        related_name='sentiments',
+        related_name='sentiment_tags',
         related_query_name='sentiment_tag'
     )
     sentiment = models.ForeignKey(
         Sentiment, on_delete=models.CASCADE,
-        related_name='comments',
+        related_name='comment_tags',
         related_query_name='comment_tag'
     )
     magnitude = models.FloatField()
