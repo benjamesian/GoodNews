@@ -176,9 +176,10 @@ def main():
         sock.bind(server_address)
         sock.listen(1)
 
-        connection, client_address = sock.accept()
-        print(f"accepted connection from {client_address}")
-        handle_connection(connection)
+        while True:
+            connection, client_address = sock.accept()
+            print(f"accepted connection from {client_address}")
+            handle_connection(connection)
 
 
 if __name__ == "__main__":
