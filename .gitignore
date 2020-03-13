@@ -24,6 +24,7 @@ venv/
 
 # blacklist sensitive credentials
 credentials/
+credentials.tar.gz
 
 # blacklist static site files
 static/
