@@ -17,37 +17,56 @@ class Sentiment(models.Model):
     picture = models.ImageField(upload_to='icons/', blank=True, max_length=254)
 
     def __str__(self):
-        return f"{self.name} ({self.id})"
+        """Return a string representing a sentiment"""
+        return f"{self.name}"
 
 
 class ArticleSentimentTag(models.Model):
     """Intermediate model for relating corpora to sentiments"""
-    corpus = models.ForeignKey('Article', on_delete=models.CASCADE)
-    sentiment = models.ForeignKey(Sentiment, on_delete=models.CASCADE)
+    corpus = models.ForeignKey(
+        'Article', on_delete=models.CASCADE,
+        related_name='sentiments',
+        related_query_name='sentiment_tag'
+    )
+    sentiment = models.ForeignKey(
+        Sentiment, on_delete=models.CASCADE,
+        related_name='articles',
+        related_query_name='article_tag'
+    )
     magnitude = models.FloatField()
 
     def __str__(self):
-        return (f"A{self.corpus.id}-{self.sentiment.name}"
-                f"-{self.magnitude} ({self.id})")
+        """Return a string representing a sentiment tag"""
+        # return (f"A{self.corpus.id}-{self.sentiment.name}"
+        #         f"-{self.magnitude} ({self.id})")
 
 
 class Article(models.Model):
     """Representation of an article"""
-    url = models.URLField(max_length=254)
-    title = models.CharField(default='Article Title', max_length=254)
+    url = models.URLField(max_length=254, null=False, primary_key=True)
+    title = models.CharField(default='(untitled)', max_length=254)
     author = models.CharField(max_length=254)
     created_at = models.DateTimeField(default=None)
     picture_url = models.URLField(blank=True)
     sentiments = models.ManyToManyField(Sentiment, through=ArticleSentimentTag)
 
     def __str__(self):
-        return f"{self.title[:12]}... ({self.id})"
+        """Return a string representing an article"""
+        # return f"{self.title[:12]}... ({self.id})"
 
 
 class CommentSentimentTag(models.Model):
     """Intermediate model for relating corpora to sentiments"""
-    corpus = models.ForeignKey('Comment', on_delete=models.CASCADE)
-    sentiment = models.ForeignKey(Sentiment, on_delete=models.CASCADE)
+    corpus = models.ForeignKey(
+        'Comment', on_delete=models.CASCADE,
+        related_name='sentiments',
+        related_query_name='sentiment_tag'
+    )
+    sentiment = models.ForeignKey(
+        Sentiment, on_delete=models.CASCADE,
+        related_name='comments',
+        related_query_name='comment_tag'
+    )
     magnitude = models.FloatField()
 
 
