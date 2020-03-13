@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """This is a module docstring."""
 import json
-import os
 import requests
 
-API_KEY = os.getenv('GOOD_NEWS_IBM_CLOUD_API_KEY')
+with open('/data/current/credentials/goodnews-ibm-credentials.json') as cred_file:
+    CREDENTIALS = json.loads(cred_file)
+    API_KEY = CREDENTIALS['apikey2']
 URL = ("https://api.us-south.tone-analyzer.watson.cloud.ibm.com"
        "/instances/0a8e6873-8e98-4aa7-a559-90114da2c819"
        "/v3/tone")
