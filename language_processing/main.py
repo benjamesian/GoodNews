@@ -13,6 +13,21 @@ from language_processing.ibmcloud.ibmcloud import get_sentiments
 #     '801-web-02': '34.73.252.236'
 # }
 
+LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.DEBUG)
+HANDLER = logging.handlers.SysLogHandler(address='/dev/log')
+HANDLER.setLevel(logging.DEBUG)
+LOGGER.addHandler(HANDLER)
+
+URL_BASE = '{}://{}'.format(
+    os.getenv('GOOD_NEWS_API_SCHEMA', 'http'),
+    os.getenv('GOOD_NEWS_API_HOST', 'localhost/')
+)
+URL_ENDPOINT = '{}/post_articles/'.format(URL_BASE)
+URL_LOGIN = '{}/admin'.format(URL_BASE)
+USERNAME = os.getenv('GOOD_NEWS_USERNAME')
+PASSWORD = os.getenv('GOOD_NEWS_PASSWORD')
+
 
 def add_articles(articles):
     """Post articles to api endpoint so that can be added to db."""
@@ -181,18 +196,6 @@ def main():
 
 
 if __name__ == "__main__":
-    LOGGER = logging.getLogger(__name__)
-    LOGGER.setLevel(logging.DEBUG)
-    HANDLER = logging.handlers.SysLogHandler(address='/dev/log')
-    HANDLER.setLevel(logging.DEBUG)
-    LOGGER.addHandler(HANDLER)
     LOGGER.debug('start language processing service')
-    URL_ENDPOINT = '{}://{}/'.format(
-        os.getenv('GOOD_NEWS_API_SCHEMA', 'http'),
-        os.getenv('GOOD_NEWS_API_HOST', 'localhost/')
-    )
-    URL_LOGIN = '{}admin'.format(URL_ENDPOINT)
-    USERNAME = os.getenv('GOOD_NEWS_USERNAME')
-    PASSWORD = os.getenv('GOOD_NEWS_PASSWORD')
     main()
     LOGGER.debug('language processing service finished')
