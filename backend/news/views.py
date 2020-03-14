@@ -1,5 +1,6 @@
 """Connect data and routes to relevant views."""
 import json
+from django.contrib.auth import authenticate, login
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
 from django.views import generic
@@ -18,11 +19,16 @@ class IndexView(generic.ListView):
         return articles
 
 
-@staff_member_required
 def post_articles(request):
     """Post articles to the database."""
     try:
         data = json.loads(request.body.decode('utf-8'))
+        print(data)
+        username = data['username']
+        password = data['password']
+        user = authenticate(request, username=username, password=password)
+        if user is None or not user.is_staff:
+            return JsonResponse({'message': 'only staff can add content'})
     except json.decoder.JSONDecodeError:
         return JsonResponse({'error': 'bad json'}, 400)
     articles = data.get('articles', [])

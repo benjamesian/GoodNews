@@ -18,13 +18,16 @@ LOGGER.setLevel(logging.DEBUG)
 HANDLER = logging.handlers.SysLogHandler(address='/dev/log')
 HANDLER.setLevel(logging.DEBUG)
 LOGGER.addHandler(HANDLER)
+# HANDLER = logging.FileHandler('lang.log')
+# HANDLER.setLevel(logging.DEBUG)
+# LOGGER.addHandler(HANDLER)
 
 URL_BASE = '{}://{}'.format(
     os.getenv('GOOD_NEWS_API_SCHEMA', 'http'),
-    os.getenv('GOOD_NEWS_API_HOST', 'localhost/')
+    os.getenv('GOOD_NEWS_API_HOST', 'localhost')
 )
 URL_ENDPOINT = '{}/post_articles/'.format(URL_BASE)
-URL_LOGIN = '{}/admin'.format(URL_BASE)
+URL_LOGIN = '{}/admin/'.format(URL_BASE)
 USERNAME = os.getenv('GOOD_NEWS_USERNAME')
 PASSWORD = os.getenv('GOOD_NEWS_PASSWORD')
 
@@ -34,23 +37,25 @@ def add_articles(articles):
     with requests.Session() as session:
         LOGGER.debug('grabbing csrf token from %s', URL_LOGIN)
         session.get(URL_LOGIN)
-        session.headers.update({
-            'X-CSRFToken': session.cookies.get('csrftoken')
-        })
+        # session.headers.update({
+        #     'X-CSRFToken': session.cookies.get('csrftoken')
+        # })
 
-        login_data = dict(username=USERNAME,
-                          password=PASSWORD,
-                          next='/')
-        LOGGER.debug('posting login data to %s', URL_LOGIN)
-        session.post(URL_LOGIN, data=login_data,
-                     headers=dict(Referer=URL_LOGIN))
+        # params = dict(username=USERNAME, password=PASSWORD)
+        # LOGGER.debug('posting login data to %s', URL_LOGIN)
+        # session.post(URL_LOGIN, params=params,
+        #              headers=dict(Referer=URL_LOGIN))
+
+        data = articles
+        data['username'] = USERNAME
+        data['password'] = PASSWORD
 
         session.headers.update({
             'content-type': 'application/json',
             'X-CSRFToken': session.cookies.get('csrftoken')
         })
-        LOGGER.debug('posting articles: %s to: %s', articles, URL_ENDPOINT)
-        session.post(URL_ENDPOINT, data=json.dumps(articles))
+        LOGGER.debug('posting articles: %s to: %s', data, URL_ENDPOINT)
+        session.post(URL_ENDPOINT, data=json.dumps(data))
 
 
 def get_batch_sentiments(articles):
