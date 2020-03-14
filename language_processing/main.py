@@ -182,6 +182,7 @@ def main():
 
 if __name__ == "__main__":
     LOGGER = logging.getLogger(__name__)
+    LOGGER.setLevel(logging.DEBUG)
     HANDLER = logging.handlers.SysLogHandler(address='/dev/log')
     HANDLER.setLevel(logging.DEBUG)
     LOGGER.addHandler(HANDLER)
