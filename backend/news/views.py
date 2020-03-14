@@ -2,6 +2,7 @@
 import json
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
+from django.utils.decorators import method_decorator
 from django.views import generic
 from .models import Article, ArticleSentimentTag, Sentiment, User
 
@@ -17,7 +18,7 @@ class IndexView(generic.ListView):
         articles = super().get_queryset().order_by('-created_at')[:10]
         return articles
 
-    @staff_member_required
+    @method_decorator(staff_member_required)
     def post(self, request, *args, **kwargs):
         """Post articles to the database."""
         try:
