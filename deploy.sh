@@ -35,9 +35,10 @@ deploy::archive()
 {
   tee >(cat - >&2) | bash
 } << EOF
-rsync -a --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "${WORKDIR}/${RELEASE}"
 gpg --output credentials.tar.gz --decrypt credentials.tar.gz.gpg
 tar -xzf credentials.tar.gz credentials
+rm credentials.tar.gz
+rsync -a --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "${WORKDIR}/${RELEASE}"
 tar -czf "${WORKDIR}/${RELEASE}.tar.gz" -C "${WORKDIR}" -- "${RELEASE}"
 exit
 EOF

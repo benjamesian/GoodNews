@@ -108,18 +108,18 @@ def consume_length_header(connection: socket.socket) -> int:
     '''consume a length header and return length value'''
     raw_header = connection.recv(32)
     content_length = raw_header.strip(b'<length> ')
-    return int(content_length)
+    if content_length.isdigit():
+        return int(content_length)
+    raise ValueError('bad header', raw_header)
 
 
-def get_data(connection: socket.socket, chunksize: int = 4096) -> bytes:
+def get_data(connection: socket.socket, length: int, chunksize: int = 4096) -> bytes:
     '''get data from a message with a length header'''
-    bytes_remaining = consume_length_header(connection)
-
     data = b''
-    while bytes_remaining > chunksize:
+    while length > chunksize:
         data += connection.recv(chunksize)
-        bytes_remaining -= chunksize
-    data += connection.recv(bytes_remaining)
+        length -= chunksize
+    data += connection.recv(length)
 
     return data
 
@@ -130,7 +130,11 @@ def handle_connection(connection: socket.socket):
         data = b''
         resp = b'MSG'
         try:
-            data = get_data(connection, 4096)
+            length = consume_length_header(connection)
+            data = get_data(connection, length, 4096)
+        except ValueError as ex:
+            resp += '-EHEADER'
+            logging.exception('Bad value, likely length header %s', ex)
         except (ConnectionError, OSError) as err:
             resp += b'-ERECV'
             logging.exception('recv error: %s', err)

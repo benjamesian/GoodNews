@@ -6,9 +6,10 @@ After=network.target
 User=ubuntu
 Group=www-data
 WorkingDirectory=/data/current
-Environment=GOOD_NEWS_IBM_CLOUD_API_KEY=bj0gTWmYfHV03xyqZ-nnzZSQhQzMNADgwbttOH9NTWuS
 Environment=GOOD_NEWS_API_HOST=localhost
 Environment=GOOD_NEWS_API_SCHEMA=http
+EnvironmentFile=/data/current/credentials/goodnews-auth-credentials.env
+EnvironmentFile=/data/current/credentials/goodnews-ibm-credentials.env
 ExecStart=/usr/bin/python3.6 -m language_processing.main
 
 [Install]

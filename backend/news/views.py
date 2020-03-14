@@ -1,7 +1,7 @@
 """Connect data and routes to relevant views."""
 import json
 from django.contrib.admin.views.decorators import staff_member_required
-from django.http import HttpRequest, JsonResponse
+from django.http import JsonResponse
 from django.views import generic
 from .models import Article, ArticleSentimentTag, Sentiment, User
 
