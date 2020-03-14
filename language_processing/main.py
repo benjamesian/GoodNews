@@ -16,6 +16,7 @@ from language_processing.ibmcloud.ibmcloud import get_sentiments
 def add_articles(articles):
     """Post articles to api endpoint so that can be added to db."""
     with requests.Session() as session:
+        LOGGER.debug('grabbing csrf token from %s', URL_LOGIN)
         session.get(URL_LOGIN)
         session.headers.update({
             'X-CSRFToken': session.cookies.get('csrftoken')
@@ -24,6 +25,7 @@ def add_articles(articles):
         login_data = dict(username=USERNAME,
                           password=PASSWORD,
                           next='/')
+        LOGGER.debug('posting login data to %s', URL_LOGIN)
         session.post(URL_LOGIN, data=login_data,
                      headers=dict(Referer=URL_LOGIN))
 
@@ -31,7 +33,7 @@ def add_articles(articles):
             'content-type': 'application/json',
             'X-CSRFToken': session.cookies.get('csrftoken')
         })
-        LOGGER.debug('posting %s', articles)
+        LOGGER.debug('posting articles: %s to: %s', articles, URL_ENDPOINT)
         session.post(URL_ENDPOINT, data=json.dumps(articles))
 
 
@@ -179,7 +181,7 @@ def main():
 
 if __name__ == "__main__":
     LOGGER = logging.getLogger(__name__)
-    LOGGER.setLevel(10)
+    LOGGER.setLevel(0)
     LOGGER.debug('start language processing service')
     URL_ENDPOINT = '{}://{}'.format(
         os.getenv('GOOD_NEWS_API_SCHEMA', 'http'),
