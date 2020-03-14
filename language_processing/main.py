@@ -1,6 +1,7 @@
 '''call language processing service and post results to site'''
 import json
 import logging
+import logging.handlers
 from multiprocessing import Pool
 import os
 import socket
@@ -181,7 +182,9 @@ def main():
 
 if __name__ == "__main__":
     LOGGER = logging.getLogger(__name__)
-    LOGGER.setLevel(0)
+    LOGGER.setLevel(logging.DEBUG)
+    HANDLER = logging.handlers.SysLogHandler(address='/dev/log')
+    LOGGER.addHandler(HANDLER)
     LOGGER.debug('start language processing service')
     URL_ENDPOINT = '{}://{}'.format(
         os.getenv('GOOD_NEWS_API_SCHEMA', 'http'),
