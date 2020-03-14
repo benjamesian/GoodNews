@@ -10,7 +10,8 @@ Environment=GOOD_NEWS_API_HOST=localhost
 Environment=GOOD_NEWS_API_SCHEMA=http
 EnvironmentFile=/data/current/credentials/goodnews-auth-credentials.env
 EnvironmentFile=/data/current/credentials/goodnews-ibm-credentials.env
-ExecStart=/usr/bin/python3.6 -m language_processing.main
+ExecStart=/usr/bin/env python3 -m language_processing.main
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
