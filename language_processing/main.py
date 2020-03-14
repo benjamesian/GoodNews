@@ -7,14 +7,6 @@ import socket
 import requests
 from language_processing.ibmcloud.ibmcloud import get_sentiments
 
-URL_ENDPOINT = '{}://{}'.format(
-    os.getenv('GOOD_NEWS_API_SCHEMA', 'http'),
-    os.getenv('GOOD_NEWS_API_HOST', 'localhost')
-)
-URL_LOGIN = '{}/admin'.format(URL_ENDPOINT)
-USERNAME = os.getenv('GOOD_NEWS_USERNAME')
-PASSWORD = os.getenv('GOOD_NEWS_PASSWORD')
-
 # ips = {
 #     '801-web-01': '35.196.167.155',
 #     '801-web-02': '34.73.252.236'
@@ -39,7 +31,7 @@ def add_articles(articles):
             'content-type': 'application/json',
             'X-CSRFToken': session.cookies.get('csrftoken')
         })
-        logging.debug('posting %s', articles)
+        LOGGER.debug('posting %s', articles)
         session.post(URL_ENDPOINT, data=json.dumps(articles))
 
 
@@ -134,33 +126,33 @@ def handle_connection(connection: socket.socket):
             data = get_data(connection, length, 4096)
         except ValueError as ex:
             resp += '-EHEADER'
-            logging.exception('Bad value, likely length header %s', ex)
+            LOGGER.exception('Bad value, likely length header %s', ex)
         except (ConnectionError, OSError) as err:
             resp += b'-ERECV'
-            logging.exception('recv error: %s', err)
+            LOGGER.exception('recv error: %s', err)
         else:
             try:
                 process_articles(json.loads(data.decode('utf-8')))
                 resp += b'-OK'
             except json.JSONDecodeError:
                 resp += b'-EJSON'
-                logging.warning('bad json')
+                LOGGER.warning('bad json')
             except (ConnectionError, OSError) as err:
                 resp += b'-EUNKNOWN'
-                logging.error('unknown error: %s', err)
+                LOGGER.error('unknown error: %s', err)
 
         resp += b'-DONE'
         connection.sendall(add_length_header(resp))
         retry = connection.recv(4)
 
         if not retry:
-            logging.warning('Client closed unexpectedly. data=\n%s', data)
+            LOGGER.warning('Client closed unexpectedly. data=\n%s', data)
         elif retry == b'DONE':
-            logging.debug('Client done sending messages.')
+            LOGGER.debug('Client done sending messages.')
         elif retry in {b'NEXT', b'REDO'}:
             continue
         else:
-            logging.warning('Client send unexpected reply: %s', retry)
+            LOGGER.warning('Client send unexpected reply: %s', retry)
         break
     connection.close()
 
@@ -181,9 +173,20 @@ def main():
 
         while True:
             connection, client_address = sock.accept()
-            logging.debug("accepted connection from %s", client_address)
+            LOGGER.debug("accepted connection from %s", client_address)
             handle_connection(connection)
 
 
 if __name__ == "__main__":
+    LOGGER = logging.getLogger(__name__)
+    LOGGER.setLevel(10)
+    LOGGER.debug('start language processing service')
+    URL_ENDPOINT = '{}://{}'.format(
+        os.getenv('GOOD_NEWS_API_SCHEMA', 'http'),
+        os.getenv('GOOD_NEWS_API_HOST', 'localhost')
+    )
+    URL_LOGIN = '{}/admin'.format(URL_ENDPOINT)
+    USERNAME = os.getenv('GOOD_NEWS_USERNAME')
+    PASSWORD = os.getenv('GOOD_NEWS_PASSWORD')
     main()
+    LOGGER.debug('lannguage processing service finished')
