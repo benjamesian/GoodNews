@@ -9,14 +9,14 @@
 
 # Set up the environment.
 
-set -o errexit    # If an error occurs, exit.
+set -o errexit      # If an error occurs, exit.
 
-if [[ -v DEBUG ]] # Enable debugging output if `DEBUG' is defined.
+if [[ -v DEBUG ]]   # Enable debugging output if `DEBUG' is defined.
 then
   exec {BASH_XTRACEFD}>&2
   set -o verbose -o xtrace
 fi
-if ! (( $# ))     # Set remote targets if none were supplied as arguments.
+if ! (( $# ))       # Set remote targets if none were supplied as arguments.
 then
   set -- '35.196.167.155' '34.73.252.236'
 fi
@@ -26,29 +26,25 @@ LOGFILE="${PROJECT}/deploy.log"
 EXCLUDE="${PROJECT}/deploy.ignore"
 WORKDIR="$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")"
 trap 'rm -rf -- "${WORKDIR}"' EXIT
+cd -- "${WORKDIR}"  # Enter temporary working directory
 
-set +o errexit    # Environemnt setup complete.
+set +o errexit      # Environment setup complete.
 
 # Define a function to make a local archive of a release
 # usage: deploy::archive
 deploy::archive()
 {
-  tee >(cat - >&2) | bash
-} << EOF
-gpg --output credentials.tar.gz --decrypt credentials.tar.gz.gpg
-tar -xzf credentials.tar.gz credentials
-rm credentials.tar.gz
-rsync -a --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "${WORKDIR}/${RELEASE}"
-tar -czf "${WORKDIR}/${RELEASE}.tar.gz" -C "${WORKDIR}" -- "${RELEASE}"
-exit
-EOF
+  rsync --archive --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "${RELEASE}"
+  gpg --decrypt "${PROJECT}/credentials.tar.gz.gpg" | tar -xzf - -C "${RELEASE}"
+  tar -czf "${RELEASE}.tar.gz" -- "${RELEASE}"
+}
 
 # Define a function to upload a release to a single host
 # usage: deploy::upload HOST
 deploy::upload()
 {
-  tee >(cat - >&2) | ssh -T -- "ubuntu@$1"
-  scp -- "${WORKDIR}/${RELEASE}.tar.gz" "ubuntu@$1:/data/releases"
+  ssh -T -- "ubuntu@$1"
+  scp -- "${RELEASE}.tar.gz" "ubuntu@$1:/data/releases/"
 } << EOF
 sudo --non-interactive mkdir -pm 0755 /data
 sudo --non-interactive mkdir -pm 0755 /data/releases
@@ -60,7 +56,7 @@ EOF
 # usage: deploy::install HOST
 deploy::install()
 {
-  tee >(cat - >&2) | ssh -T -- "ubuntu@$1"
+  ssh -T -- "ubuntu@$1"
 } << EOF
 cd /data/releases
 tar -xzf '${RELEASE/\'/\'\\\'\'}.tar.gz'
@@ -80,19 +76,18 @@ EOF
 # Locally archive a current copy of the project repo
 echo 'Creating local archive'
 deploy::archive | tee -a "${LOGFILE}"
-echo
 
 # Upload to hosts in parallel with a separate log for each
 echo
 for (( INDEX = 1; INDEX <= $#; ++INDEX ))
 do
-  printf 'Releaseing archive to %s\n' "${!INDEX}"
+  printf 'Uploading archive to %s\n' "${!INDEX}"
   { printf '%s: %s\n' "$(date '+%c')" "${!INDEX}"
     (deploy::upload "${!INDEX}") &
-  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").logfile"
+  } &> "$(printf "%0${##}d" "${INDEX}").logfile"
 done
 wait
-cat -- "${WORKDIR}"/*.logfile | tee -a "${LOGFILE}"
+cat -- *.logfile | tee -a "${LOGFILE}"
 
 # Install on hosts in parallel with a separate log for each
 echo
@@ -101,7 +96,7 @@ do
   printf 'Installing release on %s\n' "${!INDEX}"
   { printf '%s: %s\n' "$(date '+%c')" "${!INDEX}"
     (deploy::install "${!INDEX}") &
-  } &> "${WORKDIR}/$(printf "%0${##}d" "${INDEX}").logfile"
+  } &> "$(printf "%0${##}d" "${INDEX}").logfile"
 done
 wait
-cat -- "${WORKDIR}"/*.logfile | tee -a "${LOGFILE}"
+cat -- *.logfile | tee -a "${LOGFILE}"
