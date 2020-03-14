@@ -189,9 +189,9 @@ if __name__ == "__main__":
     LOGGER.debug('start language processing service')
     URL_ENDPOINT = '{}://{}'.format(
         os.getenv('GOOD_NEWS_API_SCHEMA', 'http'),
-        os.getenv('GOOD_NEWS_API_HOST', 'localhost')
+        os.getenv('GOOD_NEWS_API_HOST', 'localhost/')
     )
-    URL_LOGIN = '{}/admin'.format(URL_ENDPOINT)
+    URL_LOGIN = '{}admin'.format(URL_ENDPOINT)
     USERNAME = os.getenv('GOOD_NEWS_USERNAME')
     PASSWORD = os.getenv('GOOD_NEWS_PASSWORD')
     main()
