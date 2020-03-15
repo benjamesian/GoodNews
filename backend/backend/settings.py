@@ -26,6 +26,8 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = True
 
 ALLOWED_HOSTS = [
+    '127.0.0.1',
+    '::1',
     'localhost',
     'ip6-localhost',
     '35.196.167.155',
