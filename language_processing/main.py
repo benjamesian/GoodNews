@@ -55,7 +55,11 @@ def add_articles(articles):
             'X-CSRFToken': session.cookies.get('csrftoken')
         })
         LOGGER.debug('posting articles: %s to: %s', data, URL_ENDPOINT)
-        session.post(URL_ENDPOINT, data=json.dumps(data))
+        resp = session.post(URL_ENDPOINT, data=json.dumps(data))
+        LOGGER.info('server responded with: %s', resp.status_code)
+        LOGGER.debug('response headers: {%s}',
+            ', '.join(map(': '.join, resp.headers.items())))
+        LOGGER.debug('response body: %s', resp.content)
 
 
 def get_batch_sentiments(articles):

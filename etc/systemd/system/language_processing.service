@@ -6,7 +6,7 @@ After=network.target
 User=ubuntu
 Group=www-data
 WorkingDirectory=/data/current
-Environment=GOOD_NEWS_API_HOST=localhost
+Environment=GOOD_NEWS_API_HOST=127.0.0.1
 Environment=GOOD_NEWS_API_SCHEMA=http
 EnvironmentFile=/data/current/credentials/goodnews-auth-credentials.env
 EnvironmentFile=/data/current/credentials/goodnews-ibm-credentials.env
