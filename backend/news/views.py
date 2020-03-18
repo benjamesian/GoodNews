@@ -1,7 +1,6 @@
 """Connect data and routes to relevant views."""
 import json
-from django.contrib.auth import authenticate, login
-from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth import authenticate
 from django.http import JsonResponse
 from django.views import generic
 from .models import Article, ArticleSentimentTag, Sentiment, User
@@ -12,10 +11,11 @@ class IndexView(generic.ListView):
     template_name = 'news/index.html'
     context_object_name = 'ranked_news_list'
     model = Article
+    paginate_by = 25
 
     def get_queryset(self):
         """Return ranked articles for a user."""
-        articles = super().get_queryset().order_by('-created_at')[:10]
+        articles = super().get_queryset().order_by('-created_at')[:25]
         return articles
 
 
