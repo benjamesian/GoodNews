@@ -19,7 +19,7 @@ set -o errexit
 
 # Specify remote targets
 TARGETS=(
-  35.196.167.155
+  #35.196.167.155
   34.73.252.236
 )
 
@@ -49,6 +49,8 @@ set +o errexit
 # usage: deploy::archive
 deploy::archive()
 {
+  local -
+  set -o verbose
   rsync --archive --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "${RELEASE}"
   gpg --decrypt "${PROJECT}/credentials.tar.gz.gpg" | tar -xzf - -C "${RELEASE}"
   tar -czf "${RELEASE}.tar.gz" -- "${RELEASE}"
@@ -58,7 +60,7 @@ deploy::archive()
 # usage: deploy::prepare HOST
 deploy::prepare()
 {
-  ssh -T -- "ubuntu@$1"
+  tee >(cat >&2) | ssh -T -- "ubuntu@$1"
 } << EOF
 sudo --non-interactive mkdir -pm 0755 /data
 sudo --non-interactive mkdir -pm 0755 /data/releases
@@ -70,6 +72,8 @@ EOF
 # usage: deploy::release HOST
 deploy::release()
 {
+  local -
+  set -o verbose
   scp -- "${RELEASE}.tar.gz" "ubuntu@$1:/data/releases/"
 }
 
@@ -77,7 +81,7 @@ deploy::release()
 # usage: deploy::install HOST
 deploy::install()
 {
-  ssh -T -- "ubuntu@$1"
+  tee >(cat >&2) | ssh -T -- "ubuntu@$1"
 } << EOF
 if cd /data/releases
 then
@@ -105,7 +109,7 @@ EOF
 # usage: clean HOST
 deploy::cleanup()
 {
-  ssh -T -- "ubuntu@$1"
+  tee >(cat >&2) | ssh -T -- "ubuntu@$1"
 } << EOF
 if (( ${ARCHIVE_MAX:-0} > 0 ))
 then
@@ -132,7 +136,7 @@ deploy::execute()
   do
     { printf '%s: %s\n' "$(date '+%c')" "$1"
       "${func}" "$1" &
-    } > "$#.log"
+    } &> "$#.log"
     pids+=("$!")
   done
   while (( ${#pids[@]} ))
