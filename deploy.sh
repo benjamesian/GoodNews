@@ -7,39 +7,42 @@
 # 4. Apply configuration via puppet manifests.
 ########################################################
 
-# If `DEBUG' is defined, enable debugging output.
+# If `DEBUG' is defined, enable debugging output
 if [[ -v DEBUG ]]
 then
   exec {BASH_XTRACEFD}>&2
   set -o verbose -o xtrace
 fi
 
-# Initialize environment. If an error occurs, exit.
+# Initialize environment. If an error occurs, exit
 set -o errexit
 
-# Specify remote targets.
-TARGETS=('35.196.167.155' '34.73.252.236')
+# Specify remote targets
+TARGETS=(
+  35.196.167.155
+  34.73.252.236
+)
 
-# Set max number of old archives to keep.
-if ! [[ ${ARCHIVE_MAX:=10} -ne 0 ]]
+# Configure global parameters
+PROJECT=$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)
+LOGFILE=${PROJECT}/deploy.log
+EXCLUDE=${PROJECT}/deploy.ignore
+RELEASE=${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')
+if ! (( ${ARCHIVE_MAX-0} > 0 )) 2> /dev/null
 then
-  ARCHIVE_MAX=10
-fi 2> /dev/null
+  ARCHIVE_MAX=-1
+fi
 
-# Define release parameters.
-PROJECT="$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)"
-LOGFILE="${PROJECT}/deploy.log"
-EXCLUDE="${PROJECT}/deploy.ignore"
-RELEASE="${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')"
+# Create a temporary work directory
+WORKDIR=$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")
 
-# Create a temporary work directory.
-WORKDIR="$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")"
-# Remove temporary files upon exit.
+# Remove temporary files upon exit
 trap 'rm -rf -- "${WORKDIR}"' EXIT
-# Enter temporary working directory.
+
+# Enter temporary working directory
 cd -- "${WORKDIR}"
 
-# Initialization complete.
+# Initialization complete
 set +o errexit
 
 # Makes a local archive of a release
@@ -55,7 +58,7 @@ deploy::archive()
 # usage: deploy::prepare HOST
 deploy::prepare()
 {
-  tee >(cat >&2) | ssh -T -- "ubuntu@$1"
+  ssh -T -- "ubuntu@$1"
 } << EOF
 sudo --non-interactive mkdir -pm 0755 /data
 sudo --non-interactive mkdir -pm 0755 /data/releases
@@ -74,24 +77,23 @@ deploy::release()
 # usage: deploy::install HOST
 deploy::install()
 {
-  tee >(cat >&2) | ssh -T -- "ubuntu@$1"
+  ssh -T -- "ubuntu@$1"
 } << EOF
 if cd /data/releases
 then
-  if IFS='' read -r -d '' REPLY
-  then
-    mv -- "\${REPLY}" "\${REPLY}.backup"
-    tar -czf "\${REPLY}.backup.tar.gz" -- "\${REPLY}.backup"
-    rm -fr "\${REPLY}.backup"
-  fi < <(
-  find -H . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0'
-  )
-  tar -xzf '${RELEASE/\'/\'\\\'\'}.tar.gz'
-  sudo --non-interactive chown -R ubuntu:ubuntu -- '${RELEASE/\'/\'\\\'\'}'
+  find -H . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0' |
+    if IFS='' read -r -d '' REPLY
+    then
+      mv -- "\${REPLY}" "\${REPLY}.backup"
+      tar -czf "\${REPLY}.backup.tar.gz" -- "\${REPLY}.backup"
+      rm -fr "\${REPLY}.backup"
+    fi
+  tar -xzf '${RELEASE//\'/\'\\\'\'}.tar.gz'
+  sudo --non-interactive chown -R ubuntu:ubuntu -- '${RELEASE//\'/\'\\\'\'}'
   if cd /data/current
   then
-    rm -rf -- {.{.?,[^.]},}*
-    ln -sv '../releases/${RELEASE/\'/\'\\\'\'}'/* .
+    rm -fr -- * .[^.]* ..?*
+    ln -sv '../releases/${RELEASE//\'/\'\\\'\'}'/* .
     printf '%s\\0' manifests/*.pp |
       xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
   fi
@@ -103,33 +105,41 @@ EOF
 # usage: clean HOST
 deploy::cleanup()
 {
-  (( ARCHIVE_MAX < 1 )) || tee >(cat >&2) | ssh -T -- "ubuntu@$1"
+  ssh -T -- "ubuntu@$1"
 } << EOF
-find /data/releases -name '*.tar.gz' -maxdepth 1 -printf '%Ts\t%p\0' |
+if (( ${ARCHIVE_MAX:-0} > 0 ))
+then
+  find /data/releases -maxdepth 1 -iregex '.*\\.t\\(ar\\.\\)\\?g' -printf '%Ts\\t%p\\0' |
+    sort --numeric-sort --zero-terminated |
+    head --lines=$((-1*ARCHIVE_MAX)) --zero-terminated |
+    cut --fields=2 --zero-terminated |
+    xargs --max-args=1 --max-procs=0 --null --verbose rm -f --
+fi
+find /data/releases/ -maxdepth 1 -mindepth 1 -type d -printf '%Ts\\t%p\\0' |
   sort --numeric-sort --zero-terminated |
-  head --lines=$(( -1 * ARCHIVE_MAX )) --zero-terminated |
+  head --lines=-2 --zero-terminated |
   cut --fields=2 --zero-terminated |
-  xargs --max-args=1 --max-procs=0 --null --verbose rm -f --
+  xargs --max-args=1 --max-procs=0 --null --verbose rm -fr --
 EOF
 
 # Applies a function asynchronysly to mutliple hosts
 # usage: deploy::execute FUNCTION HOST ...
 deploy::execute()
 {
-  local func="$1" pids=( ) proc=0
-  shift
-  while (( ++proc <= "$#" ))
+  local func="$1"
+  local pids=( )
+  while shift && (( $# ))
   do
-    { printf '%s: %s\n' "$(date '+%c')" "${!proc}"
-      "${func}" "${!proc}" &
-    } &> "${proc}.log"
+    { printf '%s: %s\n' "$(date '+%c')" "$1"
+      "${func}" "$1" &
+    } > "$#.log"
     pids+=("$!")
   done
-  proc=0
-  while (( ++proc <= "$#" ))
+  while (( ${#pids[@]} ))
   do
-    wait "${pids[proc - 1]}"
-    cat <"${proc}.log"
+    wait -- "${pids[0]}"
+    cat -- "${#pids[@]}.log"
+    pids=("${pids[@]:1}")
   done
 }
 
@@ -137,7 +147,6 @@ deploy::execute()
 exec {stdout}>&1 1> >(tee -a "${LOGFILE}" >&"${stdout}")
 exec {stderr}>&2 2> >(tee -a "${LOGFILE}" >&"${stderr}")
 
-# Create a local archive of the project repo
 echo 'Archiving...'
 deploy::archive
 echo
