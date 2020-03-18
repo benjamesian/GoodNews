@@ -13,25 +13,18 @@ then
   exec {BASH_XTRACEFD}>&2
   set -o verbose -o xtrace
 fi
+PROGRAM="${BASH_SOURCE[0]##*/}"
+
 
 # Initialize environment. If an error occurs, exit
 set -o errexit
 
-# Specify remote targets
-TARGETS=(
-  #35.196.167.155
-  34.73.252.236
-)
-
-# Configure global parameters
+# Construct paths to project files
 PROJECT=$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)
-LOGFILE=${PROJECT}/deploy.log
-EXCLUDE=${PROJECT}/deploy.ignore
 RELEASE=${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')
-if ! (( ${ARCHIVE_MAX-0} > 0 )) 2> /dev/null
-then
-  ARCHIVE_MAX=-1
-fi
+LOGFILE=${PROJECT}/deploy.log
+EXCLUDE_FILE=${PROJECT}/deploy.ignore
+TARGETS_FILE=${PROJECT}/deploy.hosts
 
 # Create a temporary work directory
 WORKDIR=$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")
@@ -42,23 +35,55 @@ trap 'rm -rf -- "${WORKDIR}"' EXIT
 # Enter temporary working directory
 cd -- "${WORKDIR}"
 
+# Load a list of deploy targets
+TARGETS=( )
+
+if IFS=$' \t\n' read -a TARGETS -d '' -r
+then
+  printf >&2 '%s\n' 'Targets loaded:' "${TARGETS[@]}" 
+else
+  printf >&2 'Exiting.\n'
+  exit 1
+fi < <(
+if cat -- "${TARGETS_FILE}" 2> /dev/null
+then
+  printf '\0'
+  printf >&2 'Read hosts from %s\n' "${TARGETS_FILE}" 
+  exit 0
+fi
+printf >&2 'Unable to read target hosts from %s\n' "${TARGETS_FILE}"
+printf >&2 'You must create this file before you can continue.\n'
+exit 1
+)
+
 # Initialization complete
 set +o errexit
 
-# Makes a local archive of a release
-# usage: deploy::archive
-deploy::archive()
+# Makes a local archive of a upload
+# usage: archive
+archive()
 {
   local -
   set -o verbose
-  rsync --archive --exclude-from="${EXCLUDE}" -- "${PROJECT}/" "${RELEASE}"
-  gpg --decrypt "${PROJECT}/credentials.tar.gz.gpg" | tar -xzf - -C "${RELEASE}"
-  tar -czf "${RELEASE}.tar.gz" -- "${RELEASE}"
+  if rsync -a --exclude-from="${EXCLUDE_FILE}" -- "${PROJECT}/" "${RELEASE}"
+  then
+    if wait "$!"
+    then
+      if tar -xzf - -C "${RELEASE}"
+      then
+        if tar -czf "${RELEASE}.tar.gz" -- "${RELEASE}"
+        then
+          return 0
+        fi
+      fi
+    fi < <(gpg --decrypt "${PROJECT}/credentials.tar.gz.gpg")
+  fi
+  return 1
 }
 
-# Prepares a host recieve a release
-# usage: deploy::prepare HOST
-deploy::prepare()
+# Prepares a host to recieve a release
+# usage: prepare HOST
+prepare()
 {
   tee >(cat >&2) | ssh -T -- "ubuntu@$1"
 } << EOF
@@ -69,8 +94,8 @@ exit
 EOF
 
 # Uploads an archived release to a host
-# usage: deploy::release HOST
-deploy::release()
+# usage: upload HOST
+upload()
 {
   local -
   set -o verbose
@@ -78,8 +103,8 @@ deploy::release()
 }
 
 # Installs an uploaded release on host
-# usage: deploy::install HOST
-deploy::install()
+# usage: install HOST
+install()
 {
   tee >(cat >&2) | ssh -T -- "ubuntu@$1"
 } << EOF
@@ -105,20 +130,12 @@ fi
 exit
 EOF
 
-# Removes old archives. ARCHIVE_MAX to specifies how many to keep (default: 7)
+# Removes old release directories from a host
 # usage: clean HOST
-deploy::cleanup()
+cleanup()
 {
   tee >(cat >&2) | ssh -T -- "ubuntu@$1"
 } << EOF
-if (( ${ARCHIVE_MAX:-0} > 0 ))
-then
-  find /data/releases -maxdepth 1 -iregex '.*\\.t\\(ar\\.\\)\\?g' -printf '%Ts\\t%p\\0' |
-    sort --numeric-sort --zero-terminated |
-    head --lines=$((-1*ARCHIVE_MAX)) --zero-terminated |
-    cut --fields=2 --zero-terminated |
-    xargs --max-args=1 --max-procs=0 --null --verbose rm -f --
-fi
 find /data/releases/ -maxdepth 1 -mindepth 1 -type d -printf '%Ts\\t%p\\0' |
   sort --numeric-sort --zero-terminated |
   head --lines=-2 --zero-terminated |
@@ -127,11 +144,12 @@ find /data/releases/ -maxdepth 1 -mindepth 1 -type d -printf '%Ts\\t%p\\0' |
 EOF
 
 # Applies a function asynchronysly to mutliple hosts
-# usage: deploy::execute FUNCTION HOST ...
-deploy::execute()
+# usage: apply FUNCTION HOST ...
+apply()
 {
   local func="$1"
-  local pids=( )
+  local pids=()
+  local rval=0
   while shift && (( $# ))
   do
     { printf '%s: %s\n' "$(date '+%c')" "$1"
@@ -141,10 +159,14 @@ deploy::execute()
   done
   while (( ${#pids[@]} ))
   do
-    wait -- "${pids[0]}"
+    if ! wait -- "${pids[0]}"
+    then
+      rval+=1
+    fi
     cat -- "${#pids[@]}.log"
     pids=("${pids[@]:1}")
   done
+  return "$((rval))"
 }
 
 # Copy standard output and standard error to a log file
@@ -152,18 +174,39 @@ exec {stdout}>&1 1> >(tee -a "${LOGFILE}" >&"${stdout}")
 exec {stderr}>&2 2> >(tee -a "${LOGFILE}" >&"${stderr}")
 
 echo 'Archiving...'
-deploy::archive
+if ! archive
+then
+  printf >&2 '%q: Failed to create an arhive.\n' "${PROGRAM}"
+  printf >&2 'Exiting...\n'
+  exit 1
+fi
 echo
 echo 'Preparing...'
-deploy::execute deploy::prepare "${TARGETS[@]}"
+if ! apply prepare "${TARGETS[@]}"
+then
+  printf >&2 '%q: Something went wrong while preparing a target.\n' "${PROGRAM}"
+  printf >&2 'See logs.\n'
+fi
 echo
 echo 'Uploading...'
-deploy::execute deploy::release "${TARGETS[@]}"
+if ! apply upload "${TARGETS[@]}"
+then
+  printf >&2 '%q: Ran into trouble while uploading to a target.\n' "${PROGRAM}"
+  printf >&2 'See logs.\n'
+fi
 echo
 echo 'Installing...'
-deploy::execute deploy::install "${TARGETS[@]}"
+if ! apply install "${TARGETS[@]}"
+then
+  printf >&2 '%q: Ran into trouble while installing to a target.\n' "${PROGRAM}"
+  printf >&2 'See logs.\n'
+fi
 echo
 echo 'Cleaning...'
-deploy::execute deploy::cleanup "${TARGETS[@]}"
+if ! apply cleanup "${TARGETS[@]}"
+then
+  printf >&2 '%q: Something went wrong while cleaning a target.\n' "${PROGRAM}"
+  printf >&2 'See logs.\n'
+fi
 echo
 echo 'Done!'
