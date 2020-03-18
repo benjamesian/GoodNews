@@ -58,8 +58,7 @@ def add_articles(articles):
         resp = session.post(URL_ENDPOINT, data=json.dumps(data))
         LOGGER.info('server responded with: %s', resp.status_code)
         LOGGER.debug('response headers: {%s}',
-            ', '.join(map(': '.join, resp.headers.items())))
-        LOGGER.debug('response body: %s', resp.content)
+                     ', '.join(map(': '.join, resp.headers.items())))
 
 
 def get_batch_sentiments(articles):

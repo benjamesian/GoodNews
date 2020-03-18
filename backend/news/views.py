@@ -23,11 +23,13 @@ def post_articles(request):
     """Post articles to the database."""
     try:
         with open('/data/current/backend/news/views.log', 'a') as ostream:
-            data = json.loads(request.body.decode('utf-8'))
-            print(data, file=ostream)
-            username = data['username']
-            password = data['password']
             print(request.META, file=ostream)
+    except OSError:
+        pass
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+        username = data['username']
+        password = data['password']
         user = authenticate(request, username=username, password=password)
         if user is None or not user.is_staff:
             return JsonResponse({'message': 'only staff can add content'})
