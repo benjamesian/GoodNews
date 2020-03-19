@@ -69,7 +69,7 @@ def main():
 
                 send_json = b''
                 try:
-                    send_json = json.dumps(articles).encode()
+                    send_json = json.dumps(articles).encode('utf-8')
                 except json.JSONDecodeError:
                     print(f'Got bad json from {client.name}\n{send_json}',
                           file=sys.stderr)
