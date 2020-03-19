@@ -73,9 +73,7 @@ def main():
                 articles = client.results(filename)
                 print(articles, file=sys.stderr)
 
-                filenameb = filename.encode()
                 send_data = add_length_header(filename)
-
                 retries = 3
                 while True:
                     sock.sendall(send_data)
@@ -87,7 +85,7 @@ def main():
                     sock.sendall(b'REDO')
 
                 if retries == 0:
-                    print(f'Max retries reached, data={filenameb}', sys.stderr)
+                    print(f'Max retries reached, data={filename}', sys.stderr)
                 if i < len(scraping.API_CLIENTS) - 1:
                     sock.sendall(b'NEXT')
                 try:
