@@ -64,7 +64,7 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
         scraping.LOGGER.info('Requesting news from The Guardian...')
         params = {
             'format': 'json',
-            'show-fields': 'byline,headline,standfirst,thumbnail',
+            'show-fields': 'byline,headline,standfirst,thumbnail,body',
             'api-key': self.auth.get('api-key'),
             'from-date': self.data.get('timestamp'),
         }
