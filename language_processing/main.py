@@ -67,8 +67,10 @@ def get_batch_sentiments(articles):
 
 def process_articles(articles):
     '''perform processing on multiple articles and get results'''
-    article_titles = map(lambda x: x.get('title', ''), articles)
-    raw_sentiments = get_batch_sentiments(article_titles)
+    article_text = (
+        f"<h1>{article.get('title', '')}</h1>{article.get('body', '')}"
+        for article in articles)
+    raw_sentiments = get_batch_sentiments(article_text)
     raw_sentiments = [
         sent.get('document_tone', {}).get('tones', [])
         for sent in raw_sentiments
