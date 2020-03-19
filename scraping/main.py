@@ -3,8 +3,10 @@
 Get articles from the web
 """
 import json
+import os
 import socket
 import sys
+import tempfile
 import scraping
 
 
@@ -64,35 +66,35 @@ def main():
         sock.connect(scraping.SOCKET_PATH)
         for i, client in enumerate(cls() for cls in scraping.API_CLIENTS):
             if 200 <= client.request() < 300:
-                articles = client.results()
+
+                filedesc, filename = tempfile.mkstemp(prefix=b'GoodNews')
+                os.close(filedesc)
+
+                articles = client.results(filename)
                 print(articles, file=sys.stderr)
 
-                send_json = b''
-                try:
-                    send_json = json.dumps(articles).encode()
-                except json.JSONDecodeError:
-                    print(f'Got bad json from {client.name}\n{send_json}',
-                          file=sys.stderr)
-                    continue
-                send_data = add_length_header(send_json)
+                filenameb = filename.encode()
+                send_data = add_length_header(filename)
 
-                max_attempts = 3
+                retries = 3
                 while True:
                     sock.sendall(send_data)
                     status_length = consume_length_header(sock)
                     status = sock.recv(status_length)
-
-                    max_attempts -= 1
-                    if accept_status(status) or max_attempts <= 0:
+                    retries -= 1
+                    if accept_status(status) or retries <= 0:
                         break
-
                     sock.sendall(b'REDO')
 
-                if max_attempts == 0:
-                    print(f'Failed too many times, data=\n{send_json}',
-                          sys.stderr)
+                if retries == 0:
+                    print(f'Max retries reached, data={filenameb}', sys.stderr)
                 if i < len(scraping.API_CLIENTS) - 1:
                     sock.sendall(b'NEXT')
+                try:
+                    os.remove(filename)
+                except FileNotFoundError:
+                    pass
+
         sock.sendall(b'DONE')
 
 

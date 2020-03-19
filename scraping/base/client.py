@@ -12,16 +12,16 @@ class Client(ABC):  # pylint: disable=too-few-public-methods
     Definition of a class to retrieve news from a news source
     """
     name: str = None
-    api_url: str = None
+    url: str = None
 
     @abstractmethod
-    def results(self) -> List[dict]:
+    def results(self, filename: str = None) -> List[dict]:
         """
         Format the most recent response
         """
 
     @abstractmethod
-    def request(self) -> int:
+    def request(self, endpoint: str = None) -> int:
         """
         Submit a query to the specified endpoint
         """

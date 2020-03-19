@@ -129,13 +129,13 @@ def consume_length_header(connection: socket.socket) -> int:
     raise ValueError('bad header', raw_header)
 
 
-def get_data(connection: socket.socket, length: int, chunksize: int = 4096) -> bytes:
+def get_data(conn: socket.socket, length: int, chunksize: int = 4096) -> bytes:
     '''get data from a message with a length header'''
     data = b''
     while length > chunksize:
-        data += connection.recv(chunksize)
+        data += conn.recv(chunksize)
         length -= chunksize
-    data += connection.recv(length)
+    data += conn.recv(length)
 
     return data
 
@@ -147,7 +147,7 @@ def handle_connection(connection: socket.socket):
         resp = b'MSG'
         try:
             length = consume_length_header(connection)
-            data = get_data(connection, length, 4096)
+            recv_data = get_data(connection, length, 4096)
         except ValueError as ex:
             resp += '-EHEADER'
             LOGGER.exception('Bad value, likely length header %s', ex)
@@ -156,14 +156,22 @@ def handle_connection(connection: socket.socket):
             LOGGER.exception('recv error: %s', err)
         else:
             try:
-                process_articles(json.loads(data.decode('utf-8')))
-                resp += b'-OK'
+                with open(recv_data.decode(), 'r') as istream:
+                    process_articles(json.load(istream))
             except json.JSONDecodeError:
                 resp += b'-EJSON'
-                LOGGER.warning('bad json %s', data.decode())
+                LOGGER.warning('Bad JSON %s', data.decode())
+            except FileNotFoundError:
+                resp += b'-EFILE'
+                LOGGER.error('No such file: %s', data.decode())
+            except PermissionError:
+                resp += b'-EPERM'
+                LOGGER.error('Permission denied: %s', data.decode())
             except (ConnectionError, OSError) as err:
                 resp += b'-EUNKNOWN'
-                LOGGER.error('unknown error: %s', err)
+                LOGGER.error('Unknown error: %s', err)
+            else:
+                resp += b'-OK'
 
         resp += b'-DONE'
         connection.sendall(add_length_header(resp))

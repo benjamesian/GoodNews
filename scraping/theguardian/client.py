@@ -13,13 +13,13 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
     """
     Definition of a class to retrieve news from The Guardian
     """
-    api_url = '/'.join([API_URL, 'search'])
+    name = 'TheGuardian'
+    url = API_URL
     auth_file = AUTH_FILE
     data_file = DATA_FILE
-    name = 'TheGuardian'
 
     # pylint: disable=super-init-not-called
-    def __init__(self, auth_file=None, data_file=None):
+    def __init__(self, auth_file: str = None, data_file: str = None):
         """
         Instantiate a Guardian API client with credentials
         """
@@ -38,38 +38,44 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
         except OSError:
             self.data = {}
 
-    def results(self):
+    def results(self, filename: str = None):
         """
         Format the most recent response
         """
-        scraping.LOGGER.info('Preparing results from The Guardian API...')
+        scraping.LOGGER.info('Preparing results from The Guardian...')
         articles = [
             {k: item.get(v) for k, v in ARTICLE_KEY_MAP.items()}
             for item in self.data.get('response').get('results')
         ]
-        scraping.LOGGER.info('articles: %s', json.dumps(articles))
+        if filename is not None:
+            with open(filename, 'w') as ostream:
+                json.dump(articles, ostream)
+        scraping.LOGGER.info('articles: %s', )
         return articles
 
-    def request(self):
+    def request(self, endpoint: str = 'search'):
         """
         Request articles from The Guardian API
         """
-        scraping.LOGGER.info('Requesting news from The Guardian...')
+        scraping.LOGGER.info('Requesting articles from The Guardian...')
         params = {
             'format': 'json',
             'show-fields': 'byline,headline,standfirst,thumbnail,bodyText',
             'api-key': self.auth.get('api-key'),
             'from-date': self.data.get('timestamp'),
         }
-        scraping.LOGGER.debug('Sending request to %s', self.api_url)
-        resp = requests.get(self.api_url, params=params)
-        scraping.LOGGER.info('Response status %d', resp.status_code)
+        url = self.url if endpoint is None else '/'.join((self.url, endpoint))
+        scraping.LOGGER.debug('Sending request to %s', url)
+        resp = requests.get(url, params=params)
         if 200 <= resp.status_code < 300:
+            scraping.LOGGER.info('Response status %d', resp.status_code)
             self.data = resp.json()
             self.data['timestamp'] = self.timestamp()
             with open(self.data_file, 'w') as ostream:
                 json.dump(self.data, ostream)
             scraping.LOGGER.info('Wrote json to %s', self.data_file)
+        else:
+            scraping.LOGGER.warning('Response status %d', resp.status_code)
         return resp.status_code
 
 
