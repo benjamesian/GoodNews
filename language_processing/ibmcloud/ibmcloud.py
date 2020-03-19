@@ -4,10 +4,10 @@ import json
 import os
 import requests
 
-API_KEY = os.getenv('NATURAL_LANGUAGE_UNDERSTANDING_APIKEY')
-URL = ("https://api.us-south.tone-analyzer.watson.cloud.ibm.com"
-       "/instances/0a8e6873-8e98-4aa7-a559-90114da2c819"
-       "/v3/tone")
+API_KEY = os.getenv('NATURAL_LANGUAGE_UNDERSTANDING_APIKEY3')
+BASE_URL = 'https://api.us-south.tone-analyzer.watson.cloud.ibm.com'
+API_INSTANCE = os.getenv('NATURAL_LANGUAGE_UNDERSTANDING_INSTANCE3')
+URL = f'{BASE_URL}/instances/{API_INSTANCE}/v3/tone'
 HEADERS = {
     "Content-Type": "application/json"
 }
