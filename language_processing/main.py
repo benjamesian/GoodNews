@@ -160,7 +160,7 @@ def handle_connection(connection: socket.socket):
                 resp += b'-OK'
             except json.JSONDecodeError:
                 resp += b'-EJSON'
-                LOGGER.warning('bad json')
+                LOGGER.warning('bad json %s', data.decode())
             except (ConnectionError, OSError) as err:
                 resp += b'-EUNKNOWN'
                 LOGGER.error('unknown error: %s', err)
