@@ -50,6 +50,7 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
                 'created_at': item.get('webPublicationDate'),
                 'author': item.get('fields', {}).get('byline'),
                 'picture_url': item.get('fields', {}).get('thumbnail'),
+                'body': item.get('fields', {}).get('body'),
             } for item in self.data['response']['results']]
         except KeyError as exc:
             scraping.LOGGER.warning(

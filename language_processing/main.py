@@ -1,4 +1,5 @@
 '''call language processing service and post results to site'''
+from itertools import tee, filterfalse
 import json
 import logging
 import logging.handlers
@@ -37,9 +38,6 @@ def add_articles(articles):
     with requests.Session() as session:
         LOGGER.debug('grabbing csrf token from %s', URL_LOGIN)
         session.get(URL_LOGIN)
-        # session.headers.update({
-        #     'X-CSRFToken': session.cookies.get('csrftoken')
-        # })
 
         # params = dict(username=USERNAME, password=PASSWORD)
         # LOGGER.debug('posting login data to %s', URL_LOGIN)
@@ -58,8 +56,7 @@ def add_articles(articles):
         resp = session.post(URL_ENDPOINT, data=json.dumps(data))
         LOGGER.info('server responded with: %s', resp.status_code)
         LOGGER.debug('response headers: {%s}',
-            ', '.join(map(': '.join, resp.headers.items())))
-        LOGGER.debug('response body: %s', resp.content)
+                     ', '.join(map(': '.join, resp.headers.items())))
 
 
 def get_batch_sentiments(articles):
@@ -70,12 +67,17 @@ def get_batch_sentiments(articles):
 
 def process_articles(articles):
     '''perform processing on multiple articles and get results'''
-    article_titles = map(lambda x: x.get('title', ''), articles)
-    raw_sentiments = get_batch_sentiments(article_titles)
+    article_text = (
+        f"<h1>{article.get('title', '')}</h1>{article.get('body', '')}"
+        for article in articles)
+    raw_sentiments = get_batch_sentiments(article_text)
     raw_sentiments = [
         sent.get('document_tone', {}).get('tones', [])
         for sent in raw_sentiments
     ]
+    iter1, iter2 = tee(zip(articles, raw_sentiments))
+    with_sentiments = filter(lambda x: x[1], iter1)
+    without_sentiments = filterfalse(lambda x: x[1], iter2)
     articles_data = {
         'articles': [
             {
@@ -88,23 +90,15 @@ def process_articles(articles):
                     for sentiment in sentiments
                 ]
             }
-            for article, sentiments in zip(articles, raw_sentiments)]
+            for article, sentiments in with_sentiments]
     }
-    add_articles(articles_data)
+    if articles_data['articles']:
+        add_articles(articles_data)
+    else:
+        LOGGER.warning('None of the articles had sentiments!')
 
-# old wsgi when considering gunicorn
-# def application(environ, start_response):
-#     """WSGI server application"""
-#     content = json.load(environ['wsgi.input'])
-#     articles = get_batch_sentiments(content.get('data'))
-#     add_articles(articles, USERNAME, PASSWORD)
-
-#     body = {'message': 'data posted'}
-#     status = '200 OK'
-#     headers = [('Content-Type', 'application/json'),
-#                ('Content-Length', str(len(body)))]
-#     start_response(status, headers)
-#     return [json.dumps(body)]
+    for art in without_sentiments:
+        LOGGER.debug('article had no sentiments: %s', art)
 
 
 # def recvall(connection: socket.socket, chunksize: int, json=False) -> bytes:
@@ -205,6 +199,6 @@ def main():
 
 
 if __name__ == "__main__":
-    LOGGER.debug('start language processing service')
+    LOGGER.info('start language processing service')
     main()
-    LOGGER.debug('language processing service finished')
+    LOGGER.warning('language processing service finished')

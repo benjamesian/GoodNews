@@ -1,8 +1,8 @@
 """Connect data and routes to relevant views."""
 import json
-from django.contrib.auth import authenticate, login
-from django.contrib.admin.views.decorators import staff_member_required
-from django.http import JsonResponse
+from django.contrib.auth import authenticate
+from django.http import Http404, HttpRequest, JsonResponse
+from django.shortcuts import redirect
 from django.views import generic
 from .models import Article, ArticleSentimentTag, Sentiment, User
 
@@ -12,22 +12,42 @@ class IndexView(generic.ListView):
     template_name = 'news/index.html'
     context_object_name = 'ranked_news_list'
     model = Article
+    paginate_by = 25
 
     def get_queryset(self):
-        """Return ranked articles for a user."""
-        articles = super().get_queryset().order_by('-created_at')[:10]
+        """Return ranked articles for a user.
+
+        articles are tagged with anger, fear, joy, sadness, analytical, confident, and tentative
+        """
+        articles = super().get_queryset().order_by('-created_at')
+        # articles.filter(sentiments__)
         return articles
 
 
-def post_articles(request):
+def search(request: HttpRequest):
+    '''basic search functionality'''
+    query: str = request.GET.get('q')
+    query = query.lower()
+    sentiments = {'anger', 'fear', 'joy', 'sadness', 'analytical', 'confident',
+                  'tentative'}
+
+    if query not in sentiments:
+        return redirect('/')
+    return Http404('bad search')
+
+
+
+def post_articles(request: HttpRequest):
     """Post articles to the database."""
     try:
         with open('/data/current/backend/news/views.log', 'a') as ostream:
-            data = json.loads(request.body.decode('utf-8'))
-            print(data, file=ostream)
-            username = data['username']
-            password = data['password']
             print(request.META, file=ostream)
+    except OSError:
+        pass
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+        username = data['username']
+        password = data['password']
         user = authenticate(request, username=username, password=password)
         if user is None or not user.is_staff:
             return JsonResponse({'message': 'only staff can add content'})
