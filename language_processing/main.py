@@ -172,6 +172,7 @@ def handle_connection(connection: socket.socket):
                 LOGGER.error('Unknown error: %s', err)
             else:
                 resp += b'-OK'
+                LOGGER.info('Success')
 
         resp += b'-DONE'
         connection.sendall(add_length_header(resp))

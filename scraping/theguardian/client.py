@@ -3,10 +3,11 @@
 Provides a client to request articles from the Guardian API
 """
 import json
+import string
 import requests
 import scraping
 from scraping.base.client import Client as BaseClient
-from scraping.theguardian import API_URL, ARTICLE_KEY_MAP, AUTH_FILE, DATA_FILE
+from scraping.theguardian import URL, AUTH_FILE, DATA_FILE
 
 
 class Client(BaseClient):  # pylint: disable=too-few-public-methods
@@ -14,7 +15,7 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
     Definition of a class to retrieve news from The Guardian
     """
     name = 'TheGuardian'
-    url = API_URL
+    url = URL
     auth_file = AUTH_FILE
     data_file = DATA_FILE
 
@@ -43,14 +44,21 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
         Format the most recent response
         """
         scraping.LOGGER.info('Preparing results from The Guardian...')
-        articles = [
-            {k: item.get(v) for k, v in ARTICLE_KEY_MAP.items()}
-            for item in self.data.get('response').get('results')
-        ]
+        articles = [{
+            'url': item.get('webUrl'),
+            'title': item.get('webTitle'),
+            'created_at': item.get('webPublicationDate'),
+            'author': item.get('fields', {}).get('byline'),
+            'picture_url': item.get('fields', {}).get('thumbnail'),
+            'body': ''.join(filter(
+                lambda c: 32 <= ord(c) < 127,
+                item.get('fields', {}).get('bodyText', [])
+            ))
+        } for item in self.data.get('response', {}).get('results', [])]
         if filename is not None:
+            scraping.LOGGER.info('Writing article JSON to %s', filename)
             with open(filename, 'w') as ostream:
                 json.dump(articles, ostream)
-        scraping.LOGGER.info('articles: %s', )
         return articles
 
     def request(self, endpoint: str = 'search'):
@@ -71,13 +79,9 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
             scraping.LOGGER.info('Response status %d', resp.status_code)
             self.data = resp.json()
             self.data['timestamp'] = self.timestamp()
+            scraping.LOGGER.info('Writing response JSON to %s', self.data_file)
             with open(self.data_file, 'w') as ostream:
                 json.dump(self.data, ostream)
-            scraping.LOGGER.info('Wrote json to %s', self.data_file)
         else:
             scraping.LOGGER.warning('Response status %d', resp.status_code)
         return resp.status_code
-
-
-if __name__ == '__main__':
-    print(json.dumps(Client().request()))

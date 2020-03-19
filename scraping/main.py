@@ -55,7 +55,9 @@ def consume_length_header(connection: socket.socket) -> int:
     """
     raw_header = connection.recv(32)
     content_length = raw_header.strip(b'<length> ')
-    return int(content_length)
+    if content_length.isdigit():
+        return int(content_length)
+    raise ValueError('bad header', raw_header)
 
 
 def main():
@@ -67,13 +69,13 @@ def main():
         for i, client in enumerate(cls() for cls in scraping.API_CLIENTS):
             if 200 <= client.request() < 300:
 
-                filedesc, filename = tempfile.mkstemp(prefix=b'GoodNews')
+                filedesc, filename = tempfile.mkstemp(prefix='GoodNews')
                 os.close(filedesc)
 
-                articles = client.results(filename)
-                print(articles, file=sys.stderr)
+                client.results(filename)
+                print('Writing articles to', filename, file=sys.stderr)
 
-                send_data = add_length_header(filename)
+                send_data = add_length_header(filename.encode())
                 retries = 3
                 while True:
                     sock.sendall(send_data)
