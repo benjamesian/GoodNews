@@ -78,10 +78,13 @@ def process_articles(articles):
     iter1, iter2 = tee(zip(articles, raw_sentiments))
     with_sentiments = filter(lambda x: x[1], iter1)
     without_sentiments = filterfalse(lambda x: x[1], iter2)
+    article_keys = {'url', 'title', 'author', 'created_at', 'picture_url'}
     articles_data = {
         'articles': [
             {
-                'article_data': article,
+                'article_data': {
+                    k: v for k, v in article.items() if k in article_keys
+                },
                 'sentiments': [
                     {
                         'name': sentiment.get('tone_id'),
@@ -157,7 +160,7 @@ def handle_connection(connection: socket.socket):
                 resp += b'-OK'
             except json.JSONDecodeError:
                 resp += b'-EJSON'
-                LOGGER.warning('bad json')
+                LOGGER.warning('bad json %s', data.decode())
             except (ConnectionError, OSError) as err:
                 resp += b'-EUNKNOWN'
                 LOGGER.error('unknown error: %s', err)

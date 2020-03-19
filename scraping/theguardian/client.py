@@ -6,14 +6,14 @@ import json
 import requests
 import scraping
 from scraping.base.client import Client as BaseClient
-from scraping.theguardian import API, AUTH_FILE, DATA_FILE
+from scraping.theguardian import API_URL, ARTICLE_KEY_MAP, AUTH_FILE, DATA_FILE
 
 
 class Client(BaseClient):  # pylint: disable=too-few-public-methods
     """
     Definition of a class to retrieve news from The Guardian
     """
-    api_url = '/'.join([API, 'search'])
+    api_url = '/'.join([API_URL, 'search'])
     auth_file = AUTH_FILE
     data_file = DATA_FILE
     name = 'TheGuardian'
@@ -42,20 +42,13 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
         """
         Format the most recent response
         """
-        try:
-            scraping.LOGGER.info('Preparing results from The Guardian API...')
-            return [{
-                'url': item.get('webUrl'),
-                'title': item.get('webTitle'),
-                'created_at': item.get('webPublicationDate'),
-                'author': item.get('fields', {}).get('byline'),
-                'picture_url': item.get('fields', {}).get('thumbnail'),
-                'body': item.get('fields', {}).get('body'),
-            } for item in self.data['response']['results']]
-        except KeyError as exc:
-            scraping.LOGGER.warning(
-                'KeyError: %s', ', '.join(map(str, exc.args)))
-            return []
+        scraping.LOGGER.info('Preparing results from The Guardian API...')
+        articles = [
+            {k: item.get(v) for k, v in ARTICLE_KEY_MAP.items()}
+            for item in self.data.get('response').get('results')
+        ]
+        scraping.LOGGER.info('articles: %s', json.dumps(articles))
+        return articles
 
     def request(self):
         """
@@ -64,7 +57,7 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
         scraping.LOGGER.info('Requesting news from The Guardian...')
         params = {
             'format': 'json',
-            'show-fields': 'byline,headline,standfirst,thumbnail',
+            'show-fields': 'byline,headline,standfirst,thumbnail,bodyText',
             'api-key': self.auth.get('api-key'),
             'from-date': self.data.get('timestamp'),
         }
