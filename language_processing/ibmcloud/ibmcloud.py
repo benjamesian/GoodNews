@@ -4,7 +4,7 @@ import json
 import os
 import requests
 
-API_KEY = os.getenv('NATURAL_LANGUAGE_UNDERSTANDING_APIKEY2')
+API_KEY = os.getenv('NATURAL_LANGUAGE_UNDERSTANDING_APIKEY')
 URL = ("https://api.us-south.tone-analyzer.watson.cloud.ibm.com"
        "/instances/0a8e6873-8e98-4aa7-a559-90114da2c819"
        "/v3/tone")
