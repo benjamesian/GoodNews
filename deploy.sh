@@ -19,6 +19,7 @@ set -o errexit
 
 # Get the name of this script
 PROGRAM=${BASH_SOURCE[0]##*/}
+FUNCTIONS=(clean install prepare revert)
 
 # Construct paths to project files
 PROJECT=$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)
@@ -47,47 +48,47 @@ else
   printf >&2 'Exiting.\n'
   exit 1
 fi < <(
-if sed '/^[[:blank:]]*\(#\|$\)/d' "${PROJECT}/${TARGETS_FILE}" && printf '\0'
-then
-  printf >&2 'Hosts read from %s\n' "${PROJECT}/${TARGETS_FILE}"
-  exit
-fi
-exec {stdout}>&1
-exec 1>&2
-printf 'Unable to read target hosts from %s\n' "${PROJECT}/${TARGETS_FILE}"
-printf 'Either ensure the file exists or specify targets now.\n'
-read -r -N 1 -p 'Would you like to specify a set of target hosts? [Y/n] '
-echo
-if [[ ${REPLY,} != y ]]
-then
-  exit 1
-fi
-tput bold
-printf 'Hosts: (press Ctrl-D when done)'
-tput sgr0
-echo
-if ! IFS=$' \t\n' read -r -a TARGETS -d ''
-then
-  printf 'Whoops, an error occurred.\n'
-  exit 1
-fi < <(sed '/^[[:blank:]]*\(#\|$\)/d' && printf '\0')
-trap '{
-printf "%s\\n" "${TARGETS[@]}" && printf "\\0"
-} >&"${stdout}"
-' EXIT
-read -r -N 1 -p 'Would you like to save this list? [Y/n] '
-if [[ ${REPLY,} == y ]]
-then
-  if [[ -e ${PROJECT}/${TARGETS_FILE} ]]
+  if sed '/^[[:blank:]]*\(#\|$\)/d' "${PROJECT}/${TARGETS_FILE}" && printf '\0'
   then
-    read -r -N 1 -p "Overwrite ${PROJECT}/${TARGETS_FILE}? [Y/n] "
+    printf >&2 'Hosts read from %s\n' "${PROJECT}/${TARGETS_FILE}"
+    exit
   fi
-fi
-if [[ ${REPLY,} == y ]]
-then
-  printf 'Writing hosts to file %q...\n' "${PROJECT}/${TARGETS_FILE}"
-  printf > "${PROJECT}/${TARGETS_FILE}" '%s\n' "${TARGETS[@]}"
-fi
+  exec {stdout}>&1
+  exec 1>&2
+  printf 'Unable to read target hosts from %s\n' "${PROJECT}/${TARGETS_FILE}"
+  printf 'Either ensure the file exists or specify targets now.\n'
+  read -r -N 1 -p 'Would you like to specify a set of target hosts? [Y/n] '
+  echo
+  if [[ ${REPLY,} != y ]]
+  then
+    exit 1
+  fi
+  tput bold
+  printf 'Hosts: (press Ctrl-D when done)'
+  tput sgr0
+  echo
+  if ! IFS=$' \t\n' read -r -a TARGETS -d ''
+  then
+    printf 'Whoops, an error occurred.\n'
+    exit 1
+  fi < <(sed '/^[[:blank:]]*\(#\|$\)/d' && printf '\0')
+  trap '{
+  printf "%s\\n" "${TARGETS[@]}" && printf "\\0"
+  } >&"${stdout}"
+  ' EXIT
+  read -r -N 1 -p 'Would you like to save this list? [Y/n] '
+  if [[ ${REPLY,} == y ]]
+  then
+    if [[ -e ${PROJECT}/${TARGETS_FILE} ]]
+    then
+      read -r -N 1 -p "Overwrite ${PROJECT}/${TARGETS_FILE}? [Y/n] "
+    fi
+  fi
+  if [[ ${REPLY,} == y ]]
+  then
+    printf 'Writing hosts to file %q...\n' "${PROJECT}/${TARGETS_FILE}"
+    printf > "${PROJECT}/${TARGETS_FILE}" '%s\n' "${TARGETS[@]}"
+  fi
 )
 
 # Makes a local archive of a upload
@@ -96,8 +97,7 @@ archive()
 {
   local -
   set -o verbose
-  {
-    rsync -a --exclude-from="${PROJECT}/${EXCLUDE_FILE}" -- "${PROJECT}/" "${RELEASE}"
+  { rsync -a --exclude-from="${PROJECT}/${EXCLUDE_FILE}" -- "${PROJECT}/" "${RELEASE}"
   } && {
     wait "$!" && tar -xzf - -C "${RELEASE}"
   } < <(
@@ -136,43 +136,93 @@ install()
 } << EOF
 if cd /data/releases
 then
-  find -H . -maxdepth 2 -type f -samefile /data/current/AUTHORS -printf '%h\0' |
+  tar -xzf '${RELEASE//\'/\'\\\'\'}.tar.gz'
+  cp -au /data/current/www/static/ '${RELEASE//\'/\'\\\'\'}/www/static/'
+  cp -a /data/current/scraping/theguardian/data.json '${RELEASE//\'/\'\\\'\'}/scraping/theguardian/'
+  cp -a /data/current/backend/db.sqlite3 '${RELEASE//\'/\'\\\'\'}/backend/'
+  find . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0' |
     if IFS='' read -r -d '' REPLY
     then
       tar -czf "\${REPLY}.backup.tar.gz" -- "\${REPLY}"
-      rm -fr "\${REPLY}"
+      rm -fr -- "\${REPLY}" "\${REPLY}.tar.gz"
     fi
-  tar -xzf '${RELEASE//\'/\'\\\'\'}.tar.gz'
   sudo --non-interactive chown -R ubuntu:ubuntu -- '${RELEASE//\'/\'\\\'\'}'
   if cd /data/current
   then
-    cp -au www/static/ '../releases/${RELEASE//\'/\'\\\'\'}/www/static/'
-    cp -a backend/db.sqlite3 '../releases/${RELEASE//\'/\'\\\'\'}/backend/'
     rm -fr -- * .[^.]* ..?*
     ln -sv '../releases/${RELEASE//\'/\'\\\'\'}'/* ./
-    printf '%s\0' manifests/*.pp |
+    printf '%s\\0' manifests/*.pp |
       xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
   fi
 fi
 exit
 EOF
 
-# Removes old release directories from a host
+# Removes old release archives from a host
 # usage: clean HOST
-cleanup()
+clean()
 {
   tee >(cat >&2) | ssh -T -- "ubuntu@$1"
 } << EOF
-find /data/releases/ -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\t%p\0' |
-  sort --numeric-sort --zero-terminated |
-  head --lines=-25 --zero-terminated |
-  cut --fields=2- --zero-terminated |
-  xargs --max-args=1 --max-procs=0 --null --verbose rm -fr --
-find /data/releases -maxdepth 1 -type d -name 'GoodNews-*' -printf '%Ts\t%p\0'
-  sort --numeric-sort --zero-terminated |
-  head --lines=-2 --zero-terminated |
-  cut --fields=2- --zero-terminated |
-  xargs --max-args=1 --max-procs=0 --null --verbose rm -fr --
+if cd /data/releases
+then
+  { find . -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\\t%p\\0'
+  } | {
+    sort --numeric-sort --zero-terminated
+  } | {
+    head --lines=-50 --zero-terminated
+  } | {
+    cut --fields=2- --zero-terminated
+  } | {
+    xargs --max-args=1 --max-procs=0 --null --verbose rm -fr --
+  }
+  { find . -maxdepth 1 -type d -name 'GoodNews-*' -printf '%Ts\\t%p\\0'
+  } | {
+    sort --numeric-sort --zero-terminated
+  } | {
+    head --lines=-1 --zero-terminated
+  } | {
+    cut --fields=2- --zero-terminated
+  } | {
+    xargs --max-args=1 --max-procs=0 --null --verbose rm -fr --
+  }
+fi
+EOF
+
+# Reverts a host to the most recent backup
+# usage: revert HOST
+revert()
+{
+  tee >(cat >&2) | ssh -T -- "ubuntu@$1"
+} << EOF
+if cd /data/releases
+then
+  find . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0' |
+    if IFS='' read -r -d '' REPLY
+    then
+      rm -fr -- "\${REPLY}" "\${REPLY}.tar.gz"
+    fi
+  IFS='' read -r -d '' REPLY < <(
+    find . -maxdepth 1 -type f -name '*.backup.tar.gz' -printf '%Ts\\t%p\\0'
+    } | {
+      sort --numeric-sort --zero-terminated
+    } | {
+      head --lines=-1 --zero-terminated
+    } | {
+      cut --fields=2- --zero-terminated
+    } | {
+      xargs --max-args=1 --null --verbose tar -xzf --
+    }
+  )
+  tar -xzf "\${REPLY}"
+  if cd /data/current
+  then
+    rm -fr -- * .[^.]* ..?*
+    ln -sv "../releases/\${REPLY%.backup.tar.gz}"/* ./
+    printf '%s\\0' manifests/*.pp |
+      xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
+  fi
+fi
 EOF
 
 # Applies a function asynchronysly to mutliple hosts
@@ -204,44 +254,110 @@ apply()
   return "${rval}"
 }
 
-# Copy standard output and standard error to a log file
-exec {stdout}>&1 1> >(tee -a "${PROJECT}/${LOGFILE}" >&"${stdout}")
-exec {stderr}>&2 2> >(tee -a "${PROJECT}/${LOGFILE}" >&"${stderr}")
+# Prints usage information
+# usage: usage
+usage()
+{
+  printf 'usage: %s [clean|install|prepare||revert]\n' "${PROGRAM}"
+}
 
-echo 'Archiving...'
-if ! archive
+OPTIND=1
+OPTARG=''
+while getopts ':h' REPLY
+do
+  case ${REPLY} in
+    (h)
+      usage
+      exit 0
+      ;;
+    (:)
+      printf >&2 '%s: -%s: option requires an argument\n' "${PROGRAM}" "${OPTARG}"
+      usage >&2
+      exit 2
+      ;;
+    (*)
+      printf >&2 '%s: -%s: invalid option\n' "${PROGRAM}" "${OPTARG}"
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+shift "$((OPTIND - 1))"
+
+if (( $#  > 1 ))
 then
-  printf >&2 '%q: Failed to create an arhive.\n' "${PROGRAM}"
-  printf >&2 'Exiting...\n'
-  exit 1
+  printf >&2 '%s: too many arguments\n' "${PROGRAM}"
+  usage >&2
+  exit 2
 fi
-echo
-echo 'Preparing...'
-if ! apply prepare "${TARGETS[@]}"
+
+if (( $# ))
 then
-  printf >&2 '%q: Something went wrong while preparing a target.\n' "${PROGRAM}"
-  printf >&2 'See logs.\n'
+  funcname=''
+  for name in "${FUNCTIONS[@]}"
+  do
+    if [[ ${name} == "$1"* ]]
+    then
+      if [[ -n "${funcname}" ]]
+      then
+        printf >&2 '%s: %q: ambiguous command\n' "${PROGRAM}" "$1"
+        usage >&2
+        exit 2
+      fi
+      funcname="${name}"
+    fi
+  done
+  if [[ -z ${funcname} ]]
+  then
+    printf >&2 '%s: %q: unrecognized command\n' "${PROGRAM}" "$1"
+    usage >&2
+    exit 2
+  fi
 fi
-echo
-echo 'Uploading...'
-if ! apply upload "${TARGETS[@]}"
+
+if [[ -n ${funcname} ]]
 then
-  printf >&2 '%q: Ran into trouble while uploading to a target.\n' "${PROGRAM}"
-  printf >&2 'See logs.\n'
-fi
-echo
-echo 'Installing...'
-if ! apply install "${TARGETS[@]}"
-then
-  printf >&2 '%q: Ran into trouble while installing to a target.\n' "${PROGRAM}"
-  printf >&2 'See logs.\n'
-fi
-echo
-echo 'Cleaning...'
-if ! apply cleanup "${TARGETS[@]}"
-then
-  printf >&2 '%q: Something went wrong while cleaning a target.\n' "${PROGRAM}"
-  printf >&2 'See logs.\n'
-fi
-echo
-echo 'Done!'
+  apply "${funcname}" "${TARGETS[@]}"
+
+else
+  echo 'Archiving...'
+  if ! archive
+  then
+    printf >&2 '%q: Failed to create an arhive.\n' "${PROGRAM}"
+    printf >&2 'Exiting...\n'
+    exit 1
+  fi
+  echo
+  echo 'Preparing...'
+  if ! apply prepare "${TARGETS[@]}"
+  then
+    printf >&2 '%q: Something went wrong while preparing a target.\n' "${PROGRAM}"
+    printf >&2 'See logs.\n'
+  fi
+  echo
+  echo 'Uploading...'
+  if ! apply upload "${TARGETS[@]}"
+  then
+    printf >&2 '%q: Ran into trouble while uploading to a target.\n' "${PROGRAM}"
+    printf >&2 'See logs.\n'
+  fi
+  echo
+  echo 'Installing...'
+  if ! apply install "${TARGETS[@]}"
+  then
+    printf >&2 '%q: Ran into trouble while installing to a target.\n' "${PROGRAM}"
+    printf >&2 'See logs.\n'
+  fi
+  echo
+  echo 'Cleaning...'
+  if ! apply clean "${TARGETS[@]}"
+  then
+    printf >&2 '%q: Something went wrong while cleaning a target.\n' "${PROGRAM}"
+    printf >&2 'See logs.\n'
+  fi
+  echo
+fi {stdout}>&1 1> >(
+  tee -a "${PROJECT}/${LOGFILE}" >&"${stdout}"
+) {stderr}>&2 2> >(
+  tee -a "${PROJECT}/${LOGFILE}" >&"${stderr}"
+)
