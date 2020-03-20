@@ -11,10 +11,6 @@ def content_filter(articles: List[dict]) -> List[dict]:
     Filters out articles relating to coronavirus
     """
     pat = re.compile(r'\b(corona.?virus|covid.?19)\b', flags=re.IGNORECASE)
-    return list(filter(
-        lambda article:
-        dict(filter(
-            any(lambda item: pat.search(item[0]) or pat.search(item[1])),
-            article.items()
-        )), articles
-    ))
+    return [article for article in articles if not any(map(
+        lambda value: pat.search(value[1]), article.values()
+    ))]
