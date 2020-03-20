@@ -2,7 +2,7 @@
 import json
 from django.contrib.auth import authenticate
 from django.http import Http404, HttpRequest, JsonResponse
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.views import generic
 from .models import Article, ArticleSentimentTag, Sentiment, User
 
@@ -19,9 +19,16 @@ class IndexView(generic.ListView):
 
         articles are tagged with anger, fear, joy, sadness, analytical, confident, and tentative
         """
+        sentiment = self.request.GET.get('q', 'all')
+        print(sentiment)
         articles = super().get_queryset().order_by('-created_at')
         # articles.filter(sentiments__)
         return articles
+
+
+def about(request: HttpRequest):
+    '''landing page'''
+    return render(request, 'news/about.html', {})
 
 
 def search(request: HttpRequest):
@@ -34,7 +41,6 @@ def search(request: HttpRequest):
     if query not in sentiments:
         return redirect('/')
     return Http404('bad search')
-
 
 
 def post_articles(request: HttpRequest):

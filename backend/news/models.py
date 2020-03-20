@@ -17,7 +17,7 @@ class Sentiment(models.Model):
     picture = models.ImageField(upload_to='icons/', blank=True, max_length=254)
 
     def __str__(self):
-        return f"{self.name} ({self.id})"
+        return f"{self.name}"
 
 
 class ArticleSentimentTag(models.Model):
