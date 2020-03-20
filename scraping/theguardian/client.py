@@ -56,6 +56,7 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
             ))
         } for item in self.data.get('response', {}).get('results', [])]
         if filename is not None:
+            scraping.LOGGER.debug(json.dumps(articles))
             scraping.LOGGER.info('Writing article JSON to %s', filename)
             with open(filename, 'w') as ostream:
                 json.dump(articles, ostream)
