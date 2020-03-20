@@ -179,16 +179,17 @@ EOF
 # usage: apply FUNCTION HOST ...
 apply()
 {
-  local -a pids=()
-  local -i host=0
-  local -i rval=0
+  local func="$1"
+  local pids=()
+  local host=0
+  local rval=0
   shift
   while (( host++ < $# ))
   do
     {
       printf '%s: %s\n' "$(date '+%c')" "${!host}"
       {
-        "$1" "${!host}"
+        "${func}" "${!host}"
         printf 'Exit status: %d\n' "$?"
       } &
     } &> "${!host}.log"
