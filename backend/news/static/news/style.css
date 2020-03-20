@@ -1,4 +1,5 @@
 body {
+  background-color: rgba(22, 160, 252, 0.7);
   height: 100%;
   position: relative;
 }
@@ -19,7 +20,8 @@ footer {
 }
 
 #landing {
-  background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)),
+  /* background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), */
+  background: linear-gradient(rgba(247, 231, 30, 0.7), rgba(22, 160, 255, 0.7)),
     url("/static/news/landing.jpg") no-repeat center center fixed;
   background-size: cover;
   padding-bottom: 30px;

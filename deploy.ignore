@@ -1,3 +1,4 @@
+backend/db.sqlite3
 venv/
 *~
 *.py[cod]

@@ -23,9 +23,9 @@ PROGRAM=${BASH_SOURCE[0]##*/}
 # Construct paths to project files
 PROJECT=$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)
 RELEASE=${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')
-LOGFILE=${PROJECT}/deploy.log
-EXCLUDE_FILE=${PROJECT}/deploy.ignore
-TARGETS_FILE=${PROJECT}/deploy.hosts
+LOGFILE=deploy.log
+EXCLUDE_FILE=deploy.ignore
+TARGETS_FILE=deploy.hosts
 
 # Create a temporary work directory
 WORKDIR=$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")
@@ -47,14 +47,14 @@ else
   printf >&2 'Exiting.\n'
   exit 1
 fi < <(
-if sed '/^[[:blank:]]*\(#\|$\)/d' "${TARGETS_FILE}" && printf '\0'
+if sed '/^[[:blank:]]*\(#\|$\)/d' "${PROJECT}/${TARGETS_FILE}" && printf '\0'
 then
-  printf >&2 'Hosts read from %s\n' "${TARGETS_FILE}"
+  printf >&2 'Hosts read from %s\n' "${PROJECT}/${TARGETS_FILE}"
   exit
 fi
 exec {stdout}>&1
 exec 1>&2
-printf 'Unable to read target hosts from %s\n' "${TARGETS_FILE}"
+printf 'Unable to read target hosts from %s\n' "${PROJECT}/${TARGETS_FILE}"
 printf 'Either ensure the file exists or specify targets now.\n'
 read -r -N 1 -p 'Would you like to specify a set of target hosts? [Y/n] '
 echo
@@ -76,17 +76,17 @@ printf "%s\\n" "${TARGETS[@]}" && printf "\\0"
 } >&"${stdout}"
 ' EXIT
 read -r -N 1 -p 'Would you like to save this list? [Y/n] '
-echo
-if [[ ${REPLY,} != y ]]
+if [[ ${REPLY,} == y ]]
 then
-  exit 0
+  if [[ -e ${PROJECT}/${TARGETS_FILE} ]]
+  then
+    read -r -N 1 -p "Overwrite ${PROJECT}/${TARGETS_FILE}? [Y/n] "
+  fi
 fi
-if [[ -e ${TARGETS_FILE} ]] && ! mv -b -- "${TARGETS_FILE}" "${TARGETS_FILE}.old"
+if [[ ${REPLY,} == y ]]
 then
-  printf 'Failed to unlink existing file %q...\n' "${TARGETS_FILE}"
-else
-  printf 'Writing hosts to file %q...\n' "${TARGETS_FILE}"
-  printf > "${TARGETS_FILE}" '%s\n' "${TARGETS[@]}"
+  printf 'Writing hosts to file %q...\n' "${PROJECT}/${TARGETS_FILE}"
+  printf > "${PROJECT}/${TARGETS_FILE}" '%s\n' "${TARGETS[@]}"
 fi
 )
 
@@ -97,7 +97,7 @@ archive()
   local -
   set -o verbose
   {
-    rsync -a --exclude-from="${EXCLUDE_FILE}" -- "${PROJECT}/" "${RELEASE}"
+    rsync -a --exclude-from="${PROJECT}/${EXCLUDE_FILE}" -- "${PROJECT}/" "${RELEASE}"
   } && {
     wait "$!" && tar -xzf - -C "${RELEASE}"
   } < <(
@@ -136,20 +136,21 @@ install()
 } << EOF
 if cd /data/releases
 then
-  find -H . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0' |
+  find -H . -maxdepth 2 -type f -samefile /data/current/AUTHORS -printf '%h\0' |
     if IFS='' read -r -d '' REPLY
     then
-      mv -- "\${REPLY}" "\${REPLY}.backup"
-      tar -czf "\${REPLY}.backup.tar.gz" -- "\${REPLY}.backup"
-      rm -fr "\${REPLY}.backup"
+      tar -czf "\${REPLY}.backup.tar.gz" -- "\${REPLY}"
+      rm -fr "\${REPLY}"
     fi
   tar -xzf '${RELEASE//\'/\'\\\'\'}.tar.gz'
   sudo --non-interactive chown -R ubuntu:ubuntu -- '${RELEASE//\'/\'\\\'\'}'
   if cd /data/current
   then
+    cp -au www/static/ '../releases/${RELEASE//\'/\'\\\'\'}/www/static/'
+    cp -a backend/db.sqlite3 '../releases/${RELEASE//\'/\'\\\'\'}/backend/'
     rm -fr -- * .[^.]* ..?*
-    ln -sv '../releases/${RELEASE//\'/\'\\\'\'}'/* .
-    printf '%s\\0' manifests/*.pp |
+    ln -sv '../releases/${RELEASE//\'/\'\\\'\'}'/* ./
+    printf '%s\0' manifests/*.pp |
       xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
   fi
 fi
@@ -162,46 +163,49 @@ cleanup()
 {
   tee >(cat >&2) | ssh -T -- "ubuntu@$1"
 } << EOF
-{
-  find /data/releases/ -maxdepth 1 -mindepth 1 -type d -printf '%Ts\\t%p\\0'
-} | {
-  sort --numeric-sort --zero-terminated
-} | {
-  head --lines=-2 --zero-terminated
-} | {
-  cut --fields=2 --zero-terminated
-} | {
+find /data/releases/ -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\t%p\0' |
+  sort --numeric-sort --zero-terminated |
+  head --lines=-25 --zero-terminated |
+  cut --fields=2- --zero-terminated |
   xargs --max-args=1 --max-procs=0 --null --verbose rm -fr --
-}
+find /data/releases -maxdepth 1 -type d -name 'GoodNews-*' -printf '%Ts\t%p\0'
+  sort --numeric-sort --zero-terminated |
+  head --lines=-2 --zero-terminated |
+  cut --fields=2- --zero-terminated |
+  xargs --max-args=1 --max-procs=0 --null --verbose rm -fr --
 EOF
 
 # Applies a function asynchronysly to mutliple hosts
 # usage: apply FUNCTION HOST ...
 apply()
 {
-  local func="$1"
-  local forked=()
-  local failed=0
-  while shift && (( $# ))
+  local -a pids=()
+  local -i host=0
+  local -i rval=0
+  shift
+  while (( host++ < $# ))
   do
     {
-      printf '%s: %s\n' "$(date '+%c')" "$1"
-      "${func}" "$1" &
-    } &> "$#.log"
-    forked+=("$!")
+      printf '%s: %s\n' "$(date '+%c')" "${!host}"
+      {
+        "$1" "${!host}"
+        printf 'Exit status: %d\n' "$?"
+      } &
+    } &> "${!host}.log"
+    pids+=("$!")
   done
-  while (( ${#forked[@]} ))
+  host=0
+  while (( host < $# ))
   do
-    wait -- "${forked[0]}" || (( ++failed ))
-    cat -- "${#forked[@]}.log"
-    forked=("${forked[@]:1}")
+    tail -f --pid="${pids[host++]}" -- "${!host}.log"
+    rval+=$(("$(sed -n '$s/.*: //p' -- "${!host}.log")"))
   done
-  return "$((failed))"
+  return "${rval}"
 }
 
 # Copy standard output and standard error to a log file
-exec {stdout}>&1 1> >(tee -a "${LOGFILE}" >&"${stdout}")
-exec {stderr}>&2 2> >(tee -a "${LOGFILE}" >&"${stderr}")
+exec {stdout}>&1 1> >(tee -a "${PROJECT}/${LOGFILE}" >&"${stdout}")
+exec {stderr}>&2 2> >(tee -a "${PROJECT}/${LOGFILE}" >&"${stderr}")
 
 echo 'Archiving...'
 if ! archive
