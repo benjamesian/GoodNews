@@ -24,13 +24,21 @@
             <div class="navbar-collapse collapse">
                 <ul class="nav navbar-nav">
                     <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/about">About</a></li>
                     {% if user.is_authenticated %}
                     <li class="nav-item"><a class="nav-link" href="/{{ user.id }}/">Profile</a></li>
                     {% endif %}
                 </ul>
-                <form class="form-inline my-2 my-lg-0" action="/search/">
-                    <input class="form-control mr-sm-2" type="search" id="site-search" name="q" placeholder="Search"
-                        aria-label="Search">
+                <form class="form-inline my-2 my-lg-0" action="/">
+                    <div class="col-auto my-1">
+                        <select class="custom-select mr-sm-2" id="inlineFormCustomSelect" name="q">
+                            <option value="all" selected>Sentiment Filter</option>
+                            <option value="joy">Joy</option>
+                            <option value="analytical">Analytical</option>
+                            <option value="confident">Confident</option>
+                            <option value="tentative">Tentative</option>
+                        </select>
+                    </div>
                     <button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
                 </form>
             </div>
