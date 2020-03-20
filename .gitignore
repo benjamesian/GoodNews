@@ -27,7 +27,7 @@ credentials/
 credentials.tar.gz
 
 # blacklist static site files
-static/
+# static/
 
 # whitelist top-level static site files
 !/www/static
