@@ -17,3 +17,16 @@ footer {
   bottom: 0;
   width: 100%;
 }
+
+#landing {
+  background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)),
+    url("/static/news/landing.jpg") no-repeat center center fixed;
+  background-size: cover;
+  padding-bottom: 30px;
+  color: wheat;
+  font-size: 24px;
+}
+
+#landing h1 {
+  color: white;
+}
