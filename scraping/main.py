@@ -7,7 +7,8 @@ import os
 import socket
 import sys
 import tempfile
-import scraping
+from scraping import API_CLIENTS, SOCKET_PATH
+from scraping.filters import CONTENT_FILTERS
 
 
 def accept_status(status: bytes) -> bool:
@@ -63,11 +64,13 @@ def main():
     Run the program
     """
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-        sock.connect(scraping.SOCKET_PATH)
-        for i, client in enumerate(cls() for cls in scraping.API_CLIENTS):
+        sock.connect(SOCKET_PATH)
+        for i, client in enumerate(cls() for cls in API_CLIENTS):
             if 200 <= client.request() < 300:
                 filedesc, filename = tempfile.mkstemp(prefix=b'GoodNews')
                 articles = client.results(filedesc)
+                for content_filter in CONTENT_FILTERS:
+                    articles = content_filter(articles)
                 json.dump(articles, sys.stderr)
                 try:
                     os.close(filedesc)
@@ -96,7 +99,7 @@ def main():
                 if retries == 0:
                     print(f'Max retries reached: data={filename}',
                           file=sys.stderr)
-                if i < len(scraping.API_CLIENTS) - 1:
+                if i < len(API_CLIENTS) - 1:
                     sock.sendall(b'NEXT')
                 try:
                     os.remove(filename)

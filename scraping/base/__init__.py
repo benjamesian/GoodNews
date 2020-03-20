@@ -2,3 +2,4 @@
 """
 Provides base classes and utility functions
 """
+from . client import Client

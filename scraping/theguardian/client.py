@@ -3,21 +3,27 @@
 Provides a client to request articles from the Guardian API
 """
 import json
+import os
 import string
 import requests
 import scraping
-from scraping.base.client import Client as BaseClient
-from scraping.theguardian import URL, AUTH_FILE, DATA_FILE
+from scraping import base
 
 
-class Client(BaseClient):  # pylint: disable=too-few-public-methods
+class Client(base.Client):  # pylint: disable=too-few-public-methods
     """
     Definition of a class to retrieve news from The Guardian
     """
     name = 'TheGuardian'
-    url = URL
-    auth_file = AUTH_FILE
-    data_file = DATA_FILE
+    url = 'https://content.guardianapis.com'
+    auth_file = os.getenv(
+        'GOOD_NEWS_THE_GUARDIAN_AUTH_FILE',
+        os.path.join(os.path.dirname(__file__), 'auth.json')
+    )
+    data_file = os.getenv(
+        'GOOD_NEWS_THE_GUARDIAN_AUTH_FILE',
+        os.path.join(os.path.dirname(__file__), 'data.json')
+    )
 
     # pylint: disable=super-init-not-called
     def __init__(self, auth_file=None, data_file=None):
