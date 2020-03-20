@@ -67,10 +67,8 @@ def get_batch_sentiments(articles):
 
 def process_articles(articles):
     '''perform processing on multiple articles and get results'''
-    article_text = (
-        f"<h1>{article.get('title', '')}</h1>{article.get('body', '')}"
-        for article in articles)
-    raw_sentiments = get_batch_sentiments(article_text)
+    article_titles = map(lambda x: x.get('title', ''), articles)
+    raw_sentiments = get_batch_sentiments(article_titles)
     raw_sentiments = [
         sent.get('document_tone', {}).get('tones', [])
         for sent in raw_sentiments
@@ -78,13 +76,10 @@ def process_articles(articles):
     iter1, iter2 = tee(zip(articles, raw_sentiments))
     with_sentiments = filter(lambda x: x[1], iter1)
     without_sentiments = filterfalse(lambda x: x[1], iter2)
-    article_keys = {'url', 'title', 'author', 'created_at', 'picture_url'}
     articles_data = {
         'articles': [
             {
-                'article_data': {
-                    k: v for k, v in article.items() if k in article_keys
-                },
+                'article_data': article,
                 'sentiments': [
                     {
                         'name': sentiment.get('tone_id'),
@@ -129,13 +124,13 @@ def consume_length_header(connection: socket.socket) -> int:
     raise ValueError('bad header', raw_header)
 
 
-def get_data(conn: socket.socket, length: int, chunksize: int = 4096) -> bytes:
+def get_data(connection: socket.socket, length: int, chunksize: int = 4096) -> bytes:
     '''get data from a message with a length header'''
     data = b''
     while length > chunksize:
-        data += conn.recv(chunksize)
+        data += connection.recv(chunksize)
         length -= chunksize
-    data += conn.recv(length)
+    data += connection.recv(length)
 
     return data
 
@@ -147,7 +142,7 @@ def handle_connection(connection: socket.socket):
         resp = b'MSG'
         try:
             length = consume_length_header(connection)
-            recv_data = get_data(connection, length, 4096)
+            data = get_data(connection, length, 4096)
         except ValueError as ex:
             resp += '-EHEADER'
             LOGGER.exception('Bad value, likely length header %s', ex)
@@ -156,23 +151,14 @@ def handle_connection(connection: socket.socket):
             LOGGER.exception('recv error: %s', err)
         else:
             try:
-                with open(recv_data.decode(), 'r') as istream:
-                    process_articles(json.load(istream))
+                process_articles(json.loads(data.decode('utf-8')))
+                resp += b'-OK'
             except json.JSONDecodeError:
                 resp += b'-EJSON'
-                LOGGER.warning('Bad JSON %s', data.decode())
-            except FileNotFoundError:
-                resp += b'-EFILE'
-                LOGGER.error('No such file: %s', data.decode())
-            except PermissionError:
-                resp += b'-EPERM'
-                LOGGER.error('Permission denied: %s', data.decode())
+                LOGGER.warning('bad json')
             except (ConnectionError, OSError) as err:
                 resp += b'-EUNKNOWN'
-                LOGGER.error('Unknown error: %s', err)
-            else:
-                resp += b'-OK'
-                LOGGER.info('Success')
+                LOGGER.error('unknown error: %s', err)
 
         resp += b'-DONE'
         connection.sendall(add_length_header(resp))

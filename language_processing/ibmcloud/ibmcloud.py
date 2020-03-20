@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """This is a module docstring."""
+import json
 import os
 import requests
 
@@ -8,16 +9,17 @@ BASE_URL = 'https://api.us-south.tone-analyzer.watson.cloud.ibm.com'
 API_INSTANCE = os.getenv('NATURAL_LANGUAGE_UNDERSTANDING_INSTANCE3')
 URL = f'{BASE_URL}/instances/{API_INSTANCE}/v3/tone'
 HEADERS = {
-    "Content-Type": "text/html"
+    "Content-Type": "application/json"
 }
 PARAMS = {
     'version': '2017-09-21'
 }
 
 
-def get_sentiments(html_string: str):
+def get_sentiments(text: str):
     """Run text through IBM tone analysis."""
-    response = requests.post(URL, headers=HEADERS, data=html_string,
+    data = {'text': text}
+    response = requests.post(URL, headers=HEADERS, data=json.dumps(data),
                              auth=('apikey', API_KEY), params=PARAMS)
     return response.json()
 
