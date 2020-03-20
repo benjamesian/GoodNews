@@ -27,8 +27,11 @@ LOGFILE=${PROJECT}/deploy.log
 EXCLUDE_FILE=${PROJECT}/deploy.ignore
 TARGETS_FILE=${PROJECT}/deploy.hosts
 
-# Create a temporary work directory 
+# Create a temporary work directory
 WORKDIR=$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")
+
+# Initialization complete
+set +o errexit
 
 # Set a trap to remove the temporary directory upon exit
 trap 'rm -rf -- "${WORKDIR}"' EXIT
@@ -39,14 +42,14 @@ cd -- "${WORKDIR}"
 # Read in a list of target hosts
 if IFS=$' \t\n' read -a TARGETS -d '' -r
 then
-  printf >&2 '%s\n' 'Targets loaded:' "${TARGETS[@]}" 
+  printf >&2 '%s\n' 'Targets loaded:' "${TARGETS[@]}"
 else
   printf >&2 'Exiting.\n'
   exit 1
 fi < <(
 if sed '/^[[:blank:]]*\(#\|$\)/d' "${TARGETS_FILE}" && printf '\0'
 then
-  printf >&2 'Hosts read from %s\n' "${TARGETS_FILE}" 
+  printf >&2 'Hosts read from %s\n' "${TARGETS_FILE}"
   exit
 fi
 exec {stdout}>&1
@@ -87,29 +90,21 @@ else
 fi
 )
 
-# Initialization complete
-set +o errexit
-
 # Makes a local archive of a upload
 # usage: archive
 archive()
 {
   local -
   set -o verbose
-  if rsync -a --exclude-from="${EXCLUDE_FILE}" -- "${PROJECT}/" "${RELEASE}"
-  then
-    if wait "$!"
-    then
-      if tar -xzf - -C "${RELEASE}"
-      then
-        if tar -czf "${RELEASE}.tar.gz" -- "${RELEASE}"
-        then
-          return 0
-        fi
-      fi
-    fi < <(gpg --decrypt "${PROJECT}/credentials.tar.gz.gpg")
-  fi
-  return 1
+  {
+    rsync -a --exclude-from="${EXCLUDE_FILE}" -- "${PROJECT}/" "${RELEASE}"
+  } && {
+    wait "$!" && tar -xzf - -C "${RELEASE}"
+  } < <(
+    gpg --decrypt "${PROJECT}/credentials.tar.gz.gpg"
+  ) && {
+    tar -czf "${RELEASE}.tar.gz" -- "${RELEASE}"
+  }
 }
 
 # Prepares a host to recieve a release
@@ -167,11 +162,17 @@ cleanup()
 {
   tee >(cat >&2) | ssh -T -- "ubuntu@$1"
 } << EOF
-find /data/releases/ -maxdepth 1 -mindepth 1 -type d -printf '%Ts\\t%p\\0' |
-  sort --numeric-sort --zero-terminated |
-  head --lines=-2 --zero-terminated |
-  cut --fields=2 --zero-terminated |
+{
+  find /data/releases/ -maxdepth 1 -mindepth 1 -type d -printf '%Ts\\t%p\\0'
+} | {
+  sort --numeric-sort --zero-terminated
+} | {
+  head --lines=-2 --zero-terminated
+} | {
+  cut --fields=2 --zero-terminated
+} | {
   xargs --max-args=1 --max-procs=0 --null --verbose rm -fr --
+}
 EOF
 
 # Applies a function asynchronysly to mutliple hosts
@@ -179,25 +180,23 @@ EOF
 apply()
 {
   local func="$1"
-  local pids=()
-  local rval=0
+  local forked=()
+  local failed=0
   while shift && (( $# ))
   do
-    { printf '%s: %s\n' "$(date '+%c')" "$1"
+    {
+      printf '%s: %s\n' "$(date '+%c')" "$1"
       "${func}" "$1" &
     } &> "$#.log"
-    pids+=("$!")
+    forked+=("$!")
   done
-  while (( ${#pids[@]} ))
+  while (( ${#forked[@]} ))
   do
-    if ! wait -- "${pids[0]}"
-    then
-      rval+=1
-    fi
-    cat -- "${#pids[@]}.log"
-    pids=("${pids[@]:1}")
+    wait -- "${forked[0]}" || (( ++failed ))
+    cat -- "${#forked[@]}.log"
+    forked=("${forked[@]:1}")
   done
-  return "$((rval))"
+  return "$((failed))"
 }
 
 # Copy standard output and standard error to a log file
