@@ -20,7 +20,7 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
     data_file = DATA_FILE
 
     # pylint: disable=super-init-not-called
-    def __init__(self, auth_file: str = None, data_file: str = None):
+    def __init__(self, auth_file=None, data_file=None):
         """
         Instantiate a Guardian API client with credentials
         """
@@ -39,29 +39,6 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
         except OSError:
             self.data = {}
 
-    def results(self, filename: str = None):
-        """
-        Format the most recent response
-        """
-        scraping.LOGGER.info('Preparing results from The Guardian...')
-        articles = [{
-            'url': item.get('webUrl'),
-            'title': item.get('webTitle'),
-            'created_at': item.get('webPublicationDate'),
-            'author': item.get('fields', {}).get('byline'),
-            'picture_url': item.get('fields', {}).get('thumbnail'),
-            'body': ''.join(filter(
-                lambda c: 32 <= ord(c) < 127,
-                item.get('fields', {}).get('bodyText', [])
-            ))
-        } for item in self.data.get('response', {}).get('results', [])]
-        if filename is not None:
-            scraping.LOGGER.debug(json.dumps(articles))
-            scraping.LOGGER.info('Writing article JSON to %s', filename)
-            with open(filename, 'w') as ostream:
-                json.dump(articles, ostream)
-        return articles
-
     def request(self, endpoint: str = 'search'):
         """
         Request articles from The Guardian API
@@ -76,6 +53,7 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
         url = self.url if endpoint is None else '/'.join((self.url, endpoint))
         scraping.LOGGER.debug('Sending request to %s', url)
         resp = requests.get(url, params=params)
+
         if 200 <= resp.status_code < 300:
             scraping.LOGGER.info('Response status %d', resp.status_code)
             self.data = resp.json()
@@ -85,4 +63,24 @@ class Client(BaseClient):  # pylint: disable=too-few-public-methods
                 json.dump(self.data, ostream)
         else:
             scraping.LOGGER.warning('Response status %d', resp.status_code)
+
         return resp.status_code
+
+    def results(self, file=None):
+        """
+        Format the most recent response
+        """
+        scraping.LOGGER.info('Formatting results from The Guardian...')
+        articles = [{
+            'url': item.get('webUrl'),
+            'title': item.get('webTitle'),
+            'created_at': item.get('webPublicationDate'),
+            'author': item.get('fields', {}).get('byline'),
+            'picture_url': item.get('fields', {}).get('thumbnail'),
+            'body': ''.join(filter(
+                lambda c: c in string.printable,
+                item.get('fields', {}).get('bodyText', [])
+            ))
+        } for item in self.data.get('response', {}).get('results', [])]
+        self.dump(articles, file)
+        return articles

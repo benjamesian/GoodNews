@@ -27,26 +27,24 @@ def sample_analyze_sentiment(text_content):
     # Available values: NONE, UTF8, UTF16, UTF32
     encoding_type = enums.EncodingType.UTF8
 
-    response = client.analyze_sentiment(document, encoding_type=encoding_type)
+    resp = client.analyze_sentiment(document, encoding_type=encoding_type)
     # Get overall sentiment of the input document
-    print(u"Document sentiment score: {}".format(response.document_sentiment.score))
-    print(
-        u"Document sentiment magnitude: {}".format(
-            response.document_sentiment.magnitude
-        )
-    )
+    print(f"Document sentiment score: {resp.document_sentiment.score}")
+    print(f"Document sentiment magnitude: {resp.document_sentiment.magnitude}")
+
     # Get sentiment for all sentences in the document
-    for sentence in response.sentences:
-        print(u"Sentence text: {}".format(sentence.text.content))
-        print(u"Sentence sentiment score: {}".format(sentence.sentiment.score))
-        print(u"Sentence sentiment magnitude: {}".format(sentence.sentiment.magnitude))
+    for sentence in resp.sentences:
+        print(f"Sentence text: {sentence.text.content}")
+        print(f"Sentence sentiment score: {sentence.sentiment.score}")
+        print(f"Sentence sentiment magnitude: {sentence.sentiment.magnitude}")
 
     # Get the language of the text, which will be the same as
     # the language specified in the request or, if not specified,
     # the automatically-detected language.
-    print(u"Language of the text: {}".format(response.language))
+    print(f"Language of the text: {resp.language}")
 
 
 sample_analyze_sentiment("""
-Now you can use the Natural Language API to analyze some text. Run the following code to perform your first text sentiment analysis
+Now you can use the Natural Language API to analyze some text.
+Run the following code to perform your first text sentiment analysis
 """)
