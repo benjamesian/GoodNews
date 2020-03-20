@@ -25,6 +25,8 @@ class IndexView(generic.ListView):
             negative_sentiments = Sentiment.objects.filter(name__in=['anger', 'fear', 'sadness'])
             ok_sentiments = Sentiment.objects.filter(name__in=['joy', 'analytical', 'confident', 'tentative'])
             articles = articles.filter(sentiments__in=ok_sentiments).exclude(sentiments__in=negative_sentiments)
+        elif sentiment == 'none':
+            pass
         else:
             articles = articles.filter(sentiments__in=Sentiment.objects.filter(name=sentiment))
         return articles
