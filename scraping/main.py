@@ -69,8 +69,6 @@ def main():
             if 200 <= client.request() < 300:
                 filedesc, filename = tempfile.mkstemp(prefix=b'GoodNews')
                 articles = client.results(filedesc)
-                for content_filter in CONTENT_FILTERS:
-                    articles = content_filter(articles)
                 json.dump(articles, sys.stderr)
                 try:
                     os.close(filedesc)

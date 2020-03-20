@@ -8,6 +8,7 @@ import string
 import requests
 import scraping
 from scraping import base
+from scraping.filters import CONTENT_FILTERS
 
 
 class Client(base.Client):  # pylint: disable=too-few-public-methods
@@ -88,5 +89,7 @@ class Client(base.Client):  # pylint: disable=too-few-public-methods
                 item.get('fields', {}).get('bodyText', [])
             ))
         } for item in self.data.get('response', {}).get('results', [])]
+        for content_filter in CONTENT_FILTERS:
+            articles = content_filter(articles)
         self.dump(articles, file)
         return articles
