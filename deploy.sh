@@ -19,77 +19,23 @@ set -o errexit
 
 # Get the name of this script
 PROGRAM=${BASH_SOURCE[0]##*/}
-FUNCTIONS=(clean install prepare revert)
-
+# Initialize a list of defined actions
+ACTIONS=(clean install prepare revert)
 # Construct paths to project files
 PROJECT=$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)
 RELEASE=${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')
 LOGFILE=deploy.log
 EXCLUDE_FILE=deploy.ignore
 TARGETS_FILE=deploy.hosts
-
 # Create a temporary work directory
 WORKDIR=$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")
-
-# Initialization complete
-set +o errexit
-
 # Set a trap to remove the temporary directory upon exit
 trap 'rm -rf -- "${WORKDIR}"' EXIT
-
 # Chdir into the temporary directory
 cd -- "${WORKDIR}"
 
-# Read in a list of target hosts
-if IFS=$' \t\n' read -a TARGETS -d '' -r
-then
-  printf >&2 '%s\n' 'Targets loaded:' "${TARGETS[@]}"
-else
-  printf >&2 'Exiting.\n'
-  exit 1
-fi < <(
-  if sed '/^[[:blank:]]*\(#\|$\)/d' "${PROJECT}/${TARGETS_FILE}" && printf '\0'
-  then
-    printf >&2 'Hosts read from %s\n' "${PROJECT}/${TARGETS_FILE}"
-    exit
-  fi
-  exec {stdout}>&1
-  exec 1>&2
-  printf 'Unable to read target hosts from %s\n' "${PROJECT}/${TARGETS_FILE}"
-  printf 'Either ensure the file exists or specify targets now.\n'
-  read -r -N 1 -p 'Would you like to specify a set of target hosts? [Y/n] '
-  echo
-  if [[ ${REPLY,} != y ]]
-  then
-    exit 1
-  fi
-  tput bold
-  printf 'Hosts: (press Ctrl-D when done)'
-  tput sgr0
-  echo
-  if ! IFS=$' \t\n' read -r -a TARGETS -d ''
-  then
-    printf 'Whoops, an error occurred.\n'
-    exit 1
-  fi < <(sed '/^[[:blank:]]*\(#\|$\)/d' && printf '\0')
-  trap '{
-  printf "%s\\n" "${TARGETS[@]}" && printf "\\0"
-  } >&"${stdout}"
-  ' EXIT
-  read -r -N 1 -p 'Would you like to save this list? [Y/n] '
-  if [[ ${REPLY,} == y ]]
-  then
-    if [[ -e ${PROJECT}/${TARGETS_FILE} ]]
-    then
-      read -r -N 1 -p "Overwrite ${PROJECT}/${TARGETS_FILE}? [Y/n] "
-    fi
-  fi
-  if [[ ${REPLY,} == y ]]
-  then
-    printf 'Writing hosts to file %q...\n' "${PROJECT}/${TARGETS_FILE}"
-    printf > "${PROJECT}/${TARGETS_FILE}" '%s\n' "${TARGETS[@]}"
-  fi
-)
+# Initialization complete
+set +o errexit
 
 # Makes a local archive of a upload
 # usage: archive
@@ -105,6 +51,13 @@ archive()
   ) && {
     tar -czf "${RELEASE}.tar.gz" -- "${RELEASE}"
   }
+}
+
+# Prints usage information
+# usage: usage
+usage()
+{
+  printf 'usage: %s [clean|install|prepare||revert]\n' "${PROGRAM}"
 }
 
 # Prepares a host to recieve a release
@@ -128,7 +81,7 @@ upload()
   scp -- "${RELEASE}.tar.gz" "ubuntu@$1:/data/releases/"
 }
 
-# Installs an uploaded release on host
+# Installs the most recently uploaded release on host
 # usage: install HOST
 install()
 {
@@ -140,12 +93,21 @@ then
   cp -au /data/current/www/static/ '${RELEASE//\'/\'\\\'\'}/www/static/'
   cp -a /data/current/scraping/theguardian/data.json '${RELEASE//\'/\'\\\'\'}/scraping/theguardian/'
   cp -a /data/current/backend/db.sqlite3 '${RELEASE//\'/\'\\\'\'}/backend/'
-  find . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0' |
-    if IFS='' read -r -d '' REPLY
-    then
-      tar -czf "\${REPLY}.backup.tar.gz" -- "\${REPLY}"
-      rm -fr -- "\${REPLY}" "\${REPLY}.tar.gz"
-    fi
+  if wait "$!"
+  then
+    tar -czf "\${REPLY}.backup.tar.gz" -- -
+  fi < <(
+    { find . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0'
+    } || {
+      find . -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\\t%p\\0'
+    } | {
+      sort --numeric-sort --reverse --zero-terminated
+    } | {
+      head --lines=1 --zero-terminated
+    } | {
+      cut --fields=2- --zero-terminated
+    }
+  )
   sudo --non-interactive chown -R ubuntu:ubuntu -- '${RELEASE//\'/\'\\\'\'}'
   if cd /data/current
   then
@@ -203,22 +165,23 @@ then
       rm -fr -- "\${REPLY}" "\${REPLY}.tar.gz"
     fi
   IFS='' read -r -d '' REPLY < <(
-    find . -maxdepth 1 -type f -name '*.backup.tar.gz' -printf '%Ts\\t%p\\0'
+    { find . -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\\t%p\\0'
     } | {
-      sort --numeric-sort --zero-terminated
+      sort --numeric-sort --reverse --zero-terminated
     } | {
-      head --lines=-1 --zero-terminated
+      head --lines=1 --zero-terminated
     } | {
       cut --fields=2- --zero-terminated
-    } | {
-      xargs --max-args=1 --null --verbose tar -xzf --
     }
+    printf '\\0'
   )
   tar -xzf "\${REPLY}"
+  REPLY=\${REPLY%.tar.gz}
+  REPLY=\${REPLY%.backup}
   if cd /data/current
   then
     rm -fr -- * .[^.]* ..?*
-    ln -sv "../releases/\${REPLY%.backup.tar.gz}"/* ./
+    ln -sv "../releases/\${REPLY}"/* ./
     printf '%s\\0' manifests/*.pp |
       xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
   fi
@@ -254,13 +217,7 @@ apply()
   return "${rval}"
 }
 
-# Prints usage information
-# usage: usage
-usage()
-{
-  printf 'usage: %s [clean|install|prepare||revert]\n' "${PROGRAM}"
-}
-
+# Parse options
 OPTIND=1
 OPTARG=''
 while getopts ':h' REPLY
@@ -284,6 +241,7 @@ do
 done
 shift "$((OPTIND - 1))"
 
+# Check arguments
 if (( $#  > 1 ))
 then
   printf >&2 '%s: too many arguments\n' "${PROGRAM}"
@@ -291,35 +249,90 @@ then
   exit 2
 fi
 
+# Load targets
+if wait "$!" && IFS=$' \t\n' read -a TARGETS -d '' -r
+then
+  printf '%s\n' 'Targets loaded:' "${TARGETS[@]/#/$'\t'}"
+else
+  printf >&2 '%s: Failed to load targets\n' "${PROGRAM}"
+  exit 2
+fi < <(
+  if sed '/^[ \t]*\(#\|$\)/d' "${PROJECT}/${TARGETS_FILE}" && printf '\0'
+  then
+    printf >&2 'Hosts read from %s\n' "${PROJECT}/${TARGETS_FILE}"
+    exit
+  fi
+  exec {stdout}>&1
+  exec 1>&2
+  printf 'Unable to read target hosts from %s\n' "${PROJECT}/${TARGETS_FILE}"
+  if [[ ! -t 1 ]]
+  then
+    exit 1
+  fi
+  printf 'Either ensure the file exists or specify targets now.\n'
+  read -r -N 1 -p 'Would you like to specify a list of target hosts? [Y/n] '
+  echo
+  if [[ ${REPLY,} != y ]]
+  then
+    exit 1
+  fi
+  tput bold
+  printf 'Hosts: (press Ctrl-D when done)'
+  tput sgr0
+  echo
+  if ! wait "$!" && IFS=$' \t\n' read -r -a TARGETS -d ''
+  then
+    printf 'Whoops, an unexpected error occurred\n'
+    exit 1
+  fi < <(sed '/^[[:blank:]]*\(#\|$\)/d' && printf '\0')
+  trap '{
+  printf "%s\\n" "${TARGETS[@]}" && printf "\\0"
+  } >&"${stdout}"
+  ' EXIT
+  read -r -N 1 -p 'Would you like to save this list? [Y/n] '
+  if [[ ${REPLY,} != y ]]
+  then
+    exit 1
+  fi
+  if [[ -e ${PROJECT}/${TARGETS_FILE} ]]
+  then
+    read -r -N 1 -p "Overwrite ${PROJECT}/${TARGETS_FILE}? [Y/n] "
+  fi
+  if [[ ${REPLY,} != y ]]
+  then
+    exit 1
+  fi
+  printf 'Writing hosts to file %q...\n' "${PROJECT}/${TARGETS_FILE}"
+  printf > "${PROJECT}/${TARGETS_FILE}" '%s\n' "${TARGETS[@]}"
+)
+
 if (( $# ))
 then
-  funcname=''
-  for name in "${FUNCTIONS[@]}"
+  # Match provided action
+  COMMAND=''
+  for name in "${ACTIONS[@]}"
   do
     if [[ ${name} == "$1"* ]]
     then
-      if [[ -n "${funcname}" ]]
+      if [[ -n ${COMMAND} ]]
       then
-        printf >&2 '%s: %q: ambiguous command\n' "${PROGRAM}" "$1"
+        printf >&2 '%s: %q: ambiguous action\n' "${PROGRAM}" "$1"
         usage >&2
         exit 2
       fi
-      funcname="${name}"
+      COMMAND=${name}
     fi
   done
-  if [[ -z ${funcname} ]]
+  if [[ -z ${COMMAND} ]]
   then
-    printf >&2 '%s: %q: unrecognized command\n' "${PROGRAM}" "$1"
+    printf >&2 '%s: %q: unrecognized action\n' "${PROGRAM}" "$1"
     usage >&2
     exit 2
   fi
-fi
-
-if [[ -n ${funcname} ]]
-then
-  apply "${funcname}" "${TARGETS[@]}"
+  apply "${COMMAND}" "${TARGETS[@]}"
 
 else
+  # Perform full deployment
   echo 'Archiving...'
   if ! archive
   then
