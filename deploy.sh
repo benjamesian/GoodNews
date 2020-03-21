@@ -17,20 +17,22 @@ fi
 # Initialize environment (exit upon unhandled errors)
 set -o errexit
 
-# Define global constants and release parameters
+# Define program name and available commands
 PROGRAM=${BASH_SOURCE[0]##*/}
 ACTIONS=('prepare' 'install' 'clean' 'revert')
+
+# Construct paths to project files
 PROJECT=$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)
 RELEASE=${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')
 LOGFILE=deploy.log
 EXCLUDE_FILE=deploy.ignore
 TARGETS_FILE=deploy.hosts
 
-# Make a temporary working directory and remove it upon exit
+# Create a temporary working directory and remove it upon exit
 WORKDIR=$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")
 trap 'rm -rf -- "${WORKDIR}"' EXIT
 
-# Chdir into the temporary directory
+# Chdir into the new directory
 cd -- "${WORKDIR}"
 
 # Initialization complete
@@ -41,7 +43,7 @@ set +o errexit
 # usage: usage
 usage()
 {
-  printf 'usage: %s [prepare|install|clean|revert]\n' "${PROGRAM}"
+  printf 'usage: %q [prepare|install|clean|revert]\n' "${PROGRAM}"
 }
 
 
@@ -51,9 +53,10 @@ archive()
 {
   local -
   set -o verbose
-  { rsync -a --exclude-from="${PROJECT}/${EXCLUDE_FILE}" -- "${PROJECT}/" "${RELEASE}"
+  {
+    rsync -a --exclude-from="${PROJECT}/${EXCLUDE_FILE}" -- "${PROJECT}/" "${RELEASE}"
   } && {
-    wait "$!" && tar -xzf - -C "${RELEASE}"
+    tar -xzf - -C "${RELEASE}"
   } < <(
     gpg --decrypt "${PROJECT}/credentials.tar.gz.gpg"
   ) && {
@@ -101,8 +104,8 @@ then
   then
     tar -czf "\${REPLY}.backup.tar.gz" -- "\${REPLY}"
   fi < <(
-    { find . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0'
-    } || {
+    find . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0' ||
+    {
       find . -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\\t%p\\0'
     } | {
       sort --numeric-sort --reverse --zero-terminated
@@ -133,7 +136,8 @@ clean()
 } << EOF
 if cd /data/releases
 then
-  { find . -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\\t%p\\0'
+  {
+    find . -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\\t%p\\0'
   } | {
     sort --numeric-sort --zero-terminated
   } | {
@@ -143,7 +147,8 @@ then
   } | {
     xargs --max-args=1 --max-procs=0 --null --verbose rm -fr --
   }
-  { find . -maxdepth 1 -type d -name 'GoodNews-*' -printf '%Ts\\t%p\\0'
+  {
+    find . -maxdepth 1 -type d -name 'GoodNews-*' -printf '%Ts\\t%p\\0'
   } | {
     sort --numeric-sort --zero-terminated
   } | {
@@ -165,12 +170,8 @@ revert()
 } << EOF
 if cd /data/releases
 then
-  if wait "\$!" && IFS='' read -r -d '' 
-  then
-    rm -fr -- "\${REPLY}" "\${REPLY}.tar.gz"
-  fi < <(
-    find . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0'
-  )
+  find . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0' |
+    xargs --max-args=1 --null --verbose -I {} rm -fr -- {} {}.tar.gz
   if wait "\$!" && IFS='' read -r -d '' 
   then
     tar -xzf "\${REPLY}"
@@ -184,7 +185,8 @@ then
         xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
     fi
   fi < <(
-    { find . -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\\t%p\\0'
+    {
+      find . -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\\t%p\\0'
     } | {
       sort --numeric-sort --reverse --zero-terminated
     } | {
@@ -192,7 +194,6 @@ then
     } | {
       cut --fields=2- --zero-terminated
     }
-    printf '\\0'
   )
 fi
 EOF
@@ -203,7 +204,8 @@ EOF
 apply()
 {
   local func="$1"
-  local pids=()
+  local line=''
+  local pids=() 
   local host=0
   local rval=0
   shift
@@ -222,10 +224,15 @@ apply()
   while (( host < $# ))
   do
     tail -f --pid="${pids[host++]}" -- "${!host}.log"
-    rval+=$(("$(sed -n '$s/.*: //p' -- "${!host}.log")"))
+    while read -r -d ''
+    do
+      line=${REPLY}
+    done <"${!host}.log"
+    rval+=${line##*: }
   done
-  return "${rval}"
+  return "$((rval))"
 }
+
 
 # Parse command options
 #
@@ -252,14 +259,16 @@ do
 done
 shift "$((OPTIND - 1))"
 
-# Checknumber of arguments
+
+# Check argument count
 #
 if (( $#  > 1 ))
 then
-  printf >&2 '%s: too many arguments\n' "${PROGRAM}"
-  usage >&2
+  printf '%s: too many arguments\n' "${PROGRAM}"
+  usage
   exit 2
-fi
+fi >&2
+
 
 # Read targets from a file or, if the file does not exist, stdin
 #
@@ -319,35 +328,36 @@ fi < <(
   printf > "${PROJECT}/${TARGETS_FILE}" '%s\n' "${TARGETS[@]}"
 )
 
+
+# Match provided action
+#
 if (( $# ))
 then
-  # Match provided action
-  #
-  COMMAND=''
+  ACTION=''
   for name in "${ACTIONS[@]}"
   do
     if [[ ${name} == "$1"* ]]
     then
-      if [[ -n ${COMMAND} ]]
+      if [[ -n ${ACTION} ]]
       then
-        printf >&2 '%s: %q: ambiguous action\n' "${PROGRAM}" "$1"
-        usage >&2
+        printf '%s: %q: ambiguous action\n' "${PROGRAM}" "$1"
+        usage
         exit 2
-      fi
-      COMMAND=${name}
+      fi >&2
+      ACTION=${name}
     fi
   done
-  if [[ -z ${COMMAND} ]]
+  if [[ -z ${ACTION} ]]
   then
-    printf >&2 '%s: %q: unrecognized action\n' "${PROGRAM}" "$1"
-    usage >&2
+    printf '%s: %q: unrecognized action\n' "${PROGRAM}" "$1"
+    usage
     exit 2
-  fi
-  apply "${COMMAND}" "${TARGETS[@]}"
+  fi >&2
+  apply "${ACTION}" "${TARGETS[@]}"
 
+# Execute full deployment sequence
+#
 else
-  # Execute full deployment sequence
-  #
   echo 'Archiving...'
   if ! archive
   then
