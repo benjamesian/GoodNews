@@ -8,7 +8,7 @@
 # 4. Extract the repo & copy in the existing DB.
 # 5. Archive the existing version and replace it.
 # 6. Apply configuration via puppet manifests.
-# 7. Keep ARCHIVE_MAX most recent archives (default 50)
+# 7. Keep ARCHIVE_MAX most recent archives (default 50).
 # 8. Remove local temporary files and exit. 
 ########################################################
 
