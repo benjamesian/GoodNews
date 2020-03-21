@@ -2,14 +2,19 @@
 # Deploy snapshots of the GoodNews project
 #
 # For each server:
-# 1. Copy a snapshot to the server's `releases' directory.
-# 2. Link the snapshot in the `current' release directory.
-# 4. Apply configuration via puppet manifests.
+# 1. Create a local archive of the repo.
+# 2. Create required directories on each target.
+# 3. Upload a copy of the archive to each target.
+# 4. Extract the repo & copy in the existing DB.
+# 5. Archive the existing version and replace it.
+# 6. Apply configuration via puppet manifests.
+# 7. Keep ARCHIVE_MAX most recent archives (default 50)
+# 8. Remove local temporary files and exit. 
 ########################################################
 
 # Enable debugging output if `DEBUG' is defined
 if [[ -v DEBUG ]]
-then
+then# 
   exec {BASH_XTRACEFD}>&2
   set -o verbose -o xtrace
 fi
@@ -27,6 +32,7 @@ RELEASE=${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')
 LOGFILE=deploy.log
 EXCLUDE_FILE=deploy.ignore
 TARGETS_FILE=deploy.hosts
+MAX_ARCHIVES=50
 
 # Create a temporary working directory and remove it upon exit
 WORKDIR=$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")
