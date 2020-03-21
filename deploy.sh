@@ -17,25 +17,33 @@ fi
 # Initialize environment (exit upon unhandled errors)
 set -o errexit
 
-# Get the name of this script
+# Define global constants and release parameters
 PROGRAM=${BASH_SOURCE[0]##*/}
-# Initialize a list of defined actions
-ACTIONS=(clean install prepare revert)
-# Construct paths to project files
+ACTIONS=('prepare' 'install' 'clean' 'revert')
 PROJECT=$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)
 RELEASE=${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')
 LOGFILE=deploy.log
 EXCLUDE_FILE=deploy.ignore
 TARGETS_FILE=deploy.hosts
-# Create a temporary work directory
+
+# Make a temporary working directory and remove it upon exit
 WORKDIR=$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")
-# Set a trap to remove the temporary directory upon exit
 trap 'rm -rf -- "${WORKDIR}"' EXIT
+
 # Chdir into the temporary directory
 cd -- "${WORKDIR}"
 
 # Initialization complete
 set +o errexit
+
+
+# Prints usage information
+# usage: usage
+usage()
+{
+  printf 'usage: %s [prepare|install|clean|revert]\n' "${PROGRAM}"
+}
+
 
 # Makes a local archive of a upload
 # usage: archive
@@ -53,12 +61,6 @@ archive()
   }
 }
 
-# Prints usage information
-# usage: usage
-usage()
-{
-  printf 'usage: %s [clean|install|prepare||revert]\n' "${PROGRAM}"
-}
 
 # Prepares a host to recieve a release
 # usage: prepare HOST
@@ -72,6 +74,7 @@ sudo --non-interactive chown -hR ubuntu:ubuntu /data
 exit
 EOF
 
+
 # Uploads an archived release to a host
 # usage: upload HOST
 upload()
@@ -80,6 +83,7 @@ upload()
   set -o verbose
   scp -- "${RELEASE}.tar.gz" "ubuntu@$1:/data/releases/"
 }
+
 
 # Installs the most recently uploaded release on host
 # usage: install HOST
@@ -93,9 +97,9 @@ then
   cp -au /data/current/www/static/ '${RELEASE//\'/\'\\\'\'}/www/static/'
   cp -a /data/current/scraping/theguardian/data.json '${RELEASE//\'/\'\\\'\'}/scraping/theguardian/'
   cp -a /data/current/backend/db.sqlite3 '${RELEASE//\'/\'\\\'\'}/backend/'
-  if wait "$!"
+  if IFS='' read -r -d '' 
   then
-    tar -czf "\${REPLY}.backup.tar.gz" -- -
+    tar -czf "\${REPLY}.backup.tar.gz" -- "\${REPLY}"
   fi < <(
     { find . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0'
     } || {
@@ -119,6 +123,7 @@ then
 fi
 exit
 EOF
+
 
 # Removes old release archives from a host
 # usage: clean HOST
@@ -151,6 +156,7 @@ then
 fi
 EOF
 
+
 # Reverts a host to the most recent backup
 # usage: revert HOST
 revert()
@@ -159,12 +165,25 @@ revert()
 } << EOF
 if cd /data/releases
 then
-  find . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0' |
-    if IFS='' read -r -d '' REPLY
+  if wait "\$!" && IFS='' read -r -d '' 
+  then
+    rm -fr -- "\${REPLY}" "\${REPLY}.tar.gz"
+  fi < <(
+    find . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0'
+  )
+  if wait "\$!" && IFS='' read -r -d '' 
+  then
+    tar -xzf "\${REPLY}"
+    REPLY=\${REPLY%.tar.gz}
+    REPLY=\${REPLY%.backup}
+    if cd /data/current
     then
-      rm -fr -- "\${REPLY}" "\${REPLY}.tar.gz"
+      rm -fr -- * .[^.]* ..?*
+      ln -sv "../releases/\${REPLY}"/* ./
+      printf '%s\\0' manifests/*.pp |
+        xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
     fi
-  IFS='' read -r -d '' REPLY < <(
+  fi < <(
     { find . -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\\t%p\\0'
     } | {
       sort --numeric-sort --reverse --zero-terminated
@@ -175,20 +194,11 @@ then
     }
     printf '\\0'
   )
-  tar -xzf "\${REPLY}"
-  REPLY=\${REPLY%.tar.gz}
-  REPLY=\${REPLY%.backup}
-  if cd /data/current
-  then
-    rm -fr -- * .[^.]* ..?*
-    ln -sv "../releases/\${REPLY}"/* ./
-    printf '%s\\0' manifests/*.pp |
-      xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
-  fi
 fi
 EOF
 
-# Applies a function asynchronysly to mutliple hosts
+
+# Applies a function to mutliple targets asynchronysly
 # usage: apply FUNCTION HOST ...
 apply()
 {
@@ -217,7 +227,8 @@ apply()
   return "${rval}"
 }
 
-# Parse options
+# Parse command options
+#
 OPTIND=1
 OPTARG=''
 while getopts ':h' REPLY
@@ -236,12 +247,13 @@ do
       printf >&2 '%s: -%s: invalid option\n' "${PROGRAM}" "${OPTARG}"
       usage >&2
       exit 2
-      ;;
+    Perform  ;;
   esac
 done
 shift "$((OPTIND - 1))"
 
-# Check arguments
+# Checknumber of arguments
+#
 if (( $#  > 1 ))
 then
   printf >&2 '%s: too many arguments\n' "${PROGRAM}"
@@ -249,7 +261,8 @@ then
   exit 2
 fi
 
-# Load targets
+# Read targets from a file or, if the file does not exist, stdin
+#
 if wait "$!" && IFS=$' \t\n' read -a TARGETS -d '' -r
 then
   printf '%s\n' 'Targets loaded:' "${TARGETS[@]/#/$'\t'}"
@@ -309,6 +322,7 @@ fi < <(
 if (( $# ))
 then
   # Match provided action
+  #
   COMMAND=''
   for name in "${ACTIONS[@]}"
   do
@@ -332,7 +346,8 @@ then
   apply "${COMMAND}" "${TARGETS[@]}"
 
 else
-  # Perform full deployment
+  # Execute full deployment sequence
+  #
   echo 'Archiving...'
   if ! archive
   then
