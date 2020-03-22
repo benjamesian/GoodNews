@@ -5,8 +5,9 @@ Provides a base class for scrapers and API clients to inherit from
 from abc import ABC, abstractmethod
 from datetime import datetime
 from io import IOBase as IO
-from json import dump
-from os import fdopen
+import json
+import os
+import sys
 from typing import List, Union
 import scraping
 
@@ -31,24 +32,25 @@ class Client(ABC):  # pylint: disable=too-few-public-methods
         """
 
     @staticmethod
-    def dump(data, file: Union[bytes, int, str, IO] = None) -> None:
+    def dump(data, file: Union[bytes, int, str, IO]) -> None:
         """
         Dump JSON to a file
         """
-        if isinstance(file, (bytes, str)):
-            with open(file, 'w') as ostream:
-                scraping.LOGGER.info('Writing JSON to %s', ostream.name)
-                dump(data, ostream)
+        if file is None:
+            ostream = sys.stdout
+        elif isinstance(file, (bytes, str)):
+            ostream = open(file, 'w')
         elif isinstance(file, int):
-            with fdopen(file, 'w') as ostream:
-                scraping.LOGGER.info('Writing JSON to %s', ostream.name)
-                dump(data, ostream)
+            ostream = os.fdopen(file, 'w')
         elif isinstance(file, IO):
-            with fdopen(file.fileno, 'w') as ostream:
-                scraping.LOGGER.info('Writing JSON to %s', ostream.name)
-                dump(data, ostream)
+            ostream = os.fdopen(file.fileno, 'w')
         else:
-            raise TypeError(f"'file' must be of type 'str', 'int' or 'IOBase'")
+            raise TypeError("'file' must be 'bytes', 'str', 'int' or 'IOBase'")
+        try:
+            scraping.LOGGER.info('Writing JSON dump to %s', ostream.name)
+            json.dump(data, ostream)
+        finally:
+            ostream.close()
 
     @staticmethod
     def timestamp() -> str:

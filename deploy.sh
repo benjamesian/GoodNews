@@ -7,14 +7,14 @@
 # 3. Upload a copy of the archive to each target.
 # 4. Extract the repo & copy in the existing DB.
 # 5. Archive the existing version and replace it.
-# 6. Apply configuration via puppet manifests.
-# 7. Keep ARCHIVE_MAX most recent archives (default 50).
-# 8. Remove local temporary files and exit. 
+# 6. Apply configuration from puppet manifests.
+# 7. Delete all but the 50 most recent archives.
+# 8. Remove local temporary files and exit.
 ########################################################
 
 # Enable debugging output if `DEBUG' is defined
 if [[ -v DEBUG ]]
-then# 
+then
   exec {BASH_XTRACEFD}>&2
   set -o verbose -o xtrace
 fi
@@ -24,21 +24,20 @@ set -o errexit
 
 # Define program name and available commands
 PROGRAM=${BASH_SOURCE[0]##*/}
-ACTIONS=('prepare' 'install' 'clean' 'revert')
+ACTIONS=('prepare' 'clean' 'revert')
 
 # Construct paths to project files
 PROJECT=$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)
 RELEASE=${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')
-LOGFILE=deploy.log
-EXCLUDE_FILE=deploy.ignore
+LOGFILE=${PROJECT}/deploy.log
+EXCLUDE_FILE=.gitignore
 TARGETS_FILE=deploy.hosts
-MAX_ARCHIVES=50
 
 # Create a temporary working directory and remove it upon exit
 WORKDIR=$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")
 trap 'rm -rf -- "${WORKDIR}"' EXIT
-
-# Chdir into the new directory
+ 
+# Chdir into the temporary directory
 cd -- "${WORKDIR}"
 
 # Initialization complete
@@ -64,7 +63,7 @@ archive()
   } && {
     tar -xzf - -C "${RELEASE}"
   } < <(
-    gpg --decrypt "${PROJECT}/credentials.tar.gz.gpg"
+    gpg --decrypt "${RELEASE}/credentials.tar.gz.gpg"
   ) && {
     tar -czf "${RELEASE}.tar.gz" -- "${RELEASE}"
   }
@@ -103,28 +102,15 @@ install()
 if cd /data/releases
 then
   tar -xzf '${RELEASE//\'/\'\\\'\'}.tar.gz'
-  cp -au /data/current/www/static/ '${RELEASE//\'/\'\\\'\'}/www/static/'
-  cp -a /data/current/scraping/theguardian/data.json '${RELEASE//\'/\'\\\'\'}/scraping/theguardian/'
-  cp -a /data/current/backend/db.sqlite3 '${RELEASE//\'/\'\\\'\'}/backend/'
-  if IFS='' read -r -d '' 
+  if IFS='' read -r -d ''
   then
+    rsync -au --include-from='${RELEASE//\'/\'\\\'\'}/${EXCLUDE_FILE//\'/\'\\\'\'}' -- "\${REPLY}/" '${RELEASE//\'/\'\\\'\'}/'
     tar -czf "\${REPLY}.backup.tar.gz" -- "\${REPLY}"
-  fi < <(
-    find . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0' ||
-    {
-      find . -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\\t%p\\0'
-    } | {
-      sort --numeric-sort --reverse --zero-terminated
-    } | {
-      head --lines=1 --zero-terminated
-    } | {
-      cut --fields=2- --zero-terminated
-    }
-  )
+  fi < <(find . -maxdepth 2 -samefile ../current/AUTHORS -printf '%h\\0')
   sudo --non-interactive chown -R ubuntu:ubuntu -- '${RELEASE//\'/\'\\\'\'}'
   if cd /data/current
   then
-    rm -fr -- * .[^.]* ..?*
+    rm -fr -- * .*
     ln -sv '../releases/${RELEASE//\'/\'\\\'\'}'/* ./
     printf '%s\\0' manifests/*.pp |
       xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
@@ -176,23 +162,24 @@ revert()
 } << EOF
 if cd /data/releases
 then
-  find . -maxdepth 2 -type f -samefile ../current/AUTHORS -printf '%h\\0' |
-    xargs --max-args=1 --null --verbose -I {} rm -fr -- {} {}.tar.gz
-  if wait "\$!" && IFS='' read -r -d '' 
+  if IFS='' read -r -d '' 
+  then
+    rm -fr -- "\${REPLY}" "\${REPLY}.tar.gz"
+  fi < <(find . -maxdepth 2 -samefile ../current/AUTHORS -printf '%h\\0')
+
+  if IFS='' read -r -d '' 
   then
     tar -xzf "\${REPLY}"
-    REPLY=\${REPLY%.tar.gz}
-    REPLY=\${REPLY%.backup}
     if cd /data/current
     then
-      rm -fr -- * .[^.]* ..?*
-      ln -sv "../releases/\${REPLY}"/* ./
+    rm -fr -- * .*
+      ln -sv "../releases/\${REPLY%.backup.tar.gz}"/* ./
       printf '%s\\0' manifests/*.pp |
         xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
     fi
   fi < <(
     {
-      find . -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\\t%p\\0'
+      find . -maxdepth 1 -type f -name '*.backup.tar.gz' -printf '%Ts\\t%p\\0'
     } | {
       sort --numeric-sort --reverse --zero-terminated
     } | {
@@ -210,7 +197,6 @@ EOF
 apply()
 {
   local func="$1"
-  local line=''
   local pids=() 
   local host=0
   local rval=0
@@ -223,20 +209,16 @@ apply()
         "${func}" "${!host}"
         printf 'Exit status: %d\n' "$?"
       } &
-    } &> "${!host}.log"
+    } &> "${host}.log"
     pids+=("$!")
   done
   host=0
   while (( host < $# ))
   do
-    tail -f --pid="${pids[host++]}" -- "${!host}.log"
-    while read -r -d ''
-    do
-      line=${REPLY}
-    done <"${!host}.log"
-    rval+=${line##*: }
+    tail -f --pid="${pids[host++]}" -- "${host}.log"
+    rval+=$(( $(sed -n '$s/.*: //p' -- "${host}.log") ))
   done
-  return "$((rval))"
+  return "${rval}"
 }
 
 
@@ -276,23 +258,24 @@ then
 fi >&2
 
 
-# Read targets from a file or, if the file does not exist, stdin
+# Read targets from a file or, if no such file exists, stdin
 #
-if wait "$!" && IFS=$' \t\n' read -a TARGETS -d '' -r
+if wait "$!"
 then
-  printf '%s\n' 'Targets loaded:' "${TARGETS[@]/#/$'\t'}"
+  IFS=$' \t\n' mapfile -t TARGETS
+  printf '%s\n' 'Targets loaded:' "${TARGETS[@]}"
 else
-  printf >&2 '%s: Failed to load targets\n' "${PROGRAM}"
+  printf >&2 'Failed to load targets\n'
   exit 2
 fi < <(
-  if sed '/^[ \t]*\(#\|$\)/d' "${PROJECT}/${TARGETS_FILE}" && printf '\0'
+  if sed 2> /dev/null '/^[ \t]*\(#\|$\)/d' "${PROJECT}/${TARGETS_FILE}"
   then
     printf >&2 'Hosts read from %s\n' "${PROJECT}/${TARGETS_FILE}"
-    exit
+    exit 0
   fi
   exec {stdout}>&1
   exec 1>&2
-  printf 'Unable to read target hosts from %s\n' "${PROJECT}/${TARGETS_FILE}"
+  printf 'Unable to read hosts from %s\n' "${PROJECT}/${TARGETS_FILE}"
   if [[ ! -t 1 ]]
   then
     exit 1
@@ -308,16 +291,16 @@ fi < <(
   printf 'Hosts: (press Ctrl-D when done)'
   tput sgr0
   echo
-  if ! wait "$!" && IFS=$' \t\n' read -r -a TARGETS -d ''
+  if wait "$!"
   then
+    IFS=$' \t\n' mapfile -t TARGETS
+  else
     printf 'Whoops, an unexpected error occurred\n'
     exit 1
-  fi < <(sed '/^[[:blank:]]*\(#\|$\)/d' && printf '\0')
-  trap '{
-  printf "%s\\n" "${TARGETS[@]}" && printf "\\0"
-  } >&"${stdout}"
-  ' EXIT
+  fi < <(sed 2> /dev/null '/^[ \t\n]*\(#\|$\)/d')
+  trap 'printf "%s\\n" "${TARGETS[@]}" >&"${stdout}"' EXIT
   read -r -N 1 -p 'Would you like to save this list? [Y/n] '
+  echo
   if [[ ${REPLY,} != y ]]
   then
     exit 1
@@ -326,6 +309,7 @@ fi < <(
   then
     read -r -N 1 -p "Overwrite ${PROJECT}/${TARGETS_FILE}? [Y/n] "
   fi
+  echo
   if [[ ${REPLY,} != y ]]
   then
     exit 1
@@ -342,16 +326,14 @@ then
   ACTION=''
   for name in "${ACTIONS[@]}"
   do
-    if [[ ${name} == "$1"* ]]
+    [[ ${name} == "$1"* ]] || continue
+    if [[ -n ${ACTION} ]]
     then
-      if [[ -n ${ACTION} ]]
-      then
-        printf '%s: %q: ambiguous action\n' "${PROGRAM}" "$1"
-        usage
-        exit 2
-      fi >&2
-      ACTION=${name}
-    fi
+      printf '%s: %q: ambiguous action\n' "${PROGRAM}" "$1"
+      usage
+      exit 2
+    fi >&2
+    ACTION=${name}
   done
   if [[ -z ${ACTION} ]]
   then
@@ -368,40 +350,35 @@ else
   if ! archive
   then
     printf >&2 '%q: Failed to create an arhive.\n' "${PROGRAM}"
-    printf >&2 'Exiting...\n'
     exit 1
   fi
   echo
   echo 'Preparing...'
   if ! apply prepare "${TARGETS[@]}"
   then
-    printf >&2 '%q: Something went wrong while preparing a target.\n' "${PROGRAM}"
-    printf >&2 'See logs.\n'
+    printf >&2 '%q: Error occurred while preparing a target.\n' "${PROGRAM}"
   fi
   echo
   echo 'Uploading...'
   if ! apply upload "${TARGETS[@]}"
   then
-    printf >&2 '%q: Ran into trouble while uploading to a target.\n' "${PROGRAM}"
-    printf >&2 'See logs.\n'
+    printf >&2 '%q: Error occurred while uploading to a target.\n' "${PROGRAM}"
   fi
   echo
   echo 'Installing...'
   if ! apply install "${TARGETS[@]}"
   then
-    printf >&2 '%q: Ran into trouble while installing to a target.\n' "${PROGRAM}"
-    printf >&2 'See logs.\n'
+    printf >&2 '%q: Error occurred while installing to a target.\n' "${PROGRAM}"
   fi
   echo
   echo 'Cleaning...'
   if ! apply clean "${TARGETS[@]}"
   then
-    printf >&2 '%q: Something went wrong while cleaning a target.\n' "${PROGRAM}"
-    printf >&2 'See logs.\n'
+    printf >&2 '%q: Error occurred while cleaning a target.\n' "${PROGRAM}"
   fi
   echo
 fi {stdout}>&1 1> >(
-  tee -a "${PROJECT}/${LOGFILE}" >&"${stdout}"
+  tee -a "${LOGFILE}" >&"${stdout}"
 ) {stderr}>&2 2> >(
-  tee -a "${PROJECT}/${LOGFILE}" >&"${stderr}"
+  tee -a "${LOGFILE}" >&"${stderr}"
 )

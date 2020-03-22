@@ -1,35 +1,38 @@
-# blacklist temporary files
+# temporary files
 *~
 *.sw[op]
 
-# blacklist logs
+# logs
 *.log
 
-# blacklist python bytecode
+# python bytecode
 *.py[cod]
 
-# blacklist object files
+# object files
 *.so
 
-# blacklist Apple / Microsoft crap
+# Apple / Microsoft stuff
 .DS_Store
 .vscode/
 
-# blacklist Django SQL stuff
+# Django SQL stuff
 db.sqlite3
 migrations/
 
-# blacklist virtual environments
+# virtual environments
 venv/
 
-# blacklist sensitive credentials
+# sensitive credentials
 credentials/
 credentials.tar.gz
 
-# whitelist non-toplevel static web files
-/www/static/*/
+# non-toplevel static web files
+www/static/*/
 
-# blacklist tags files
+# scraping data
+scraping/theguardian/data.json
+
+# tags files
 tags
 .tags
 TAGS
