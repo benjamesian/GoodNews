@@ -104,13 +104,15 @@ then
   tar -xzf '${RELEASE//\'/\'\\\'\'}.tar.gz'
   if IFS='' read -r -d ''
   then
-    rsync -au --include-from='${RELEASE//\'/\'\\\'\'}/${EXCLUDE_FILE//\'/\'\\\'\'}' -- "\${REPLY}/" '${RELEASE//\'/\'\\\'\'}/'
+    ( cd -- '${RELEASE//\'/\'\\\'\'}' &&
+      rsync -auv --include-from='${EXCLUDE_FILE//\'/\'\\\'\'}' ../"\${REPLY}/" ./
+    )
     tar -czf "\${REPLY}.backup.tar.gz" -- "\${REPLY}"
-  fi < <(find . -maxdepth 2 -samefile ../current/AUTHORS -printf '%h\\0')
+  fi < <(find -H . -maxdepth 2 -samefile ../current/AUTHORS -printf '%h\\0')
   sudo --non-interactive chown -R ubuntu:ubuntu -- '${RELEASE//\'/\'\\\'\'}'
   if cd /data/current
   then
-    rm -fr -- * .*
+    rm -fr -- * .[^.]* ..?*
     ln -sv '../releases/${RELEASE//\'/\'\\\'\'}'/* ./
     printf '%s\\0' manifests/*.pp |
       xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
@@ -165,14 +167,14 @@ then
   if IFS='' read -r -d '' 
   then
     rm -fr -- "\${REPLY}" "\${REPLY}.tar.gz"
-  fi < <(find . -maxdepth 2 -samefile ../current/AUTHORS -printf '%h\\0')
+  fi < <(find -H . -maxdepth 2 -samefile ../current/AUTHORS -printf '%h\\0')
 
   if IFS='' read -r -d '' 
   then
     tar -xzf "\${REPLY}"
     if cd /data/current
     then
-    rm -fr -- * .*
+    rm -fr -- * .[^.]* ..?*
       ln -sv "../releases/\${REPLY%.backup.tar.gz}"/* ./
       printf '%s\\0' manifests/*.pp |
         xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
