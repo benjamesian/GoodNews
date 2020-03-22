@@ -26,9 +26,11 @@ venv/
 credentials/
 credentials.tar.gz
 
-# blacklist static site files
-# static/
-
-# whitelist top-level static site files
-!/www/static
+# whitelist non-toplevel static web files
 /www/static/*/
+
+# blacklist tags files
+tags
+.tags
+TAGS
+.TAGS
