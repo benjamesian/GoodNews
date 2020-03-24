@@ -174,7 +174,7 @@ then
     tar -xzf "\${REPLY}"
     if cd /data/current
     then
-    rm -fr -- * .[^.]* ..?*
+      rm -fr -- * .[^.]* ..?*
       ln -sv "../releases/\${REPLY%.backup.tar.gz}"/* ./
       printf '%s\\0' manifests/*.pp |
         xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
