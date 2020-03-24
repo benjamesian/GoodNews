@@ -22,31 +22,23 @@ class IndexView(generic.ListView):
         sentiment = self.request.GET.get('q', 'all')
         articles = super().get_queryset().order_by('-created_at')
         if sentiment == 'all':
-            negative_sentiments = Sentiment.objects.filter(name__in=['anger', 'fear', 'sadness'])
-            ok_sentiments = Sentiment.objects.filter(name__in=['joy', 'analytical', 'confident', 'tentative'])
-            articles = articles.filter(sentiments__in=ok_sentiments).exclude(sentiments__in=negative_sentiments)
+            negative_sentiments = Sentiment.objects.filter(
+                name__in=['anger', 'fear', 'sadness'])
+            ok_sentiments = Sentiment.objects.filter(
+                name__in=['joy', 'analytical', 'confident', 'tentative'])
+            articles = articles.filter(sentiments__in=ok_sentiments).exclude(
+                sentiments__in=negative_sentiments)
         elif sentiment == 'none':
             pass
         else:
-            articles = articles.filter(sentiments__in=Sentiment.objects.filter(name=sentiment))
+            articles = articles.filter(
+                sentiments__in=Sentiment.objects.filter(name=sentiment))
         return articles
 
 
 def about(request: HttpRequest):
     '''landing page'''
     return render(request, 'news/about.html', {})
-
-
-def search(request: HttpRequest):
-    '''basic search functionality'''
-    query: str = request.GET.get('q')
-    query = query.lower()
-    sentiments = {'anger', 'fear', 'joy', 'sadness', 'analytical', 'confident',
-                  'tentative'}
-
-    if query not in sentiments:
-        return redirect('/')
-    return Http404('bad search')
 
 
 def post_articles(request: HttpRequest):
