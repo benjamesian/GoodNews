@@ -9,10 +9,6 @@ import socket
 import requests
 from language_processing.ibmcloud.ibmcloud import get_sentiments
 
-# ips = {
-#     '801-web-01': '35.196.167.155',
-#     '801-web-02': '34.73.252.236'
-# }
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.DEBUG)
@@ -33,25 +29,23 @@ USERNAME = os.getenv('GOOD_NEWS_USERNAME')
 PASSWORD = os.getenv('GOOD_NEWS_PASSWORD')
 
 
-def add_articles(articles):
+def post_articles(articles):
     """Post articles to api endpoint so that can be added to db."""
     with requests.Session() as session:
         LOGGER.debug('grabbing csrf token from %s', URL_LOGIN)
+
         session.get(URL_LOGIN)
-
-        # params = dict(username=USERNAME, password=PASSWORD)
-        # LOGGER.debug('posting login data to %s', URL_LOGIN)
-        # session.post(URL_LOGIN, params=params,
-        #              headers=dict(Referer=URL_LOGIN))
-
-        data = articles
-        data['username'] = USERNAME
-        data['password'] = PASSWORD
-
         session.headers.update({
             'content-type': 'application/json',
             'X-CSRFToken': session.cookies.get('csrftoken')
         })
+
+        data = articles
+
+        # only staff members can post content to the site
+        data['username'] = USERNAME
+        data['password'] = PASSWORD
+
         LOGGER.debug('posting articles: %s to: %s', data, URL_ENDPOINT)
         resp = session.post(URL_ENDPOINT, data=json.dumps(data))
         LOGGER.info('server responded with: %s', resp.status_code)
@@ -66,8 +60,10 @@ def get_batch_sentiments(articles):
 
 
 def process_articles(articles):
-    '''perform processing on multiple articles and get results'''
-    article_titles = map(lambda x: x.get('title', ''), articles)
+    """
+    Tag articles with sentiments and format resulting data so it can be posted
+    to the site.
+    """
     article_text = ('\n'.join((
         '<h1>', article.get('title', ''), '</h1>', article.get('body', '')
     )) for article in articles)
@@ -76,11 +72,13 @@ def process_articles(articles):
         sent.get('document_tone', {}).get('tones', [])
         for sent in raw_sentiments
     ]
+
     iter1, iter2 = tee(zip(articles, raw_sentiments))
     with_sentiments = filter(lambda x: x[1], iter1)
     without_sentiments = filterfalse(lambda x: x[1], iter2)
+
     article_keys = {'url', 'title', 'author', 'created_at', 'picture_url'}
-    articles_data = {
+    processed_articles = {
         'articles': [
             {
                 'article_data': {
@@ -96,23 +94,27 @@ def process_articles(articles):
             }
             for article, sentiments in with_sentiments]
     }
-    if articles_data['articles']:
-        add_articles(articles_data)
+
+    return {
+        'processed': processed_articles,
+        'without_sentiments': without_sentiments
+    }
+
+
+def handle_processed_articles(data):
+    """Post articles that have been tagged with sentiments to the site.
+
+    Warn about articles that were'nt tagged with sentiments or if no articles
+    will be posted.
+    """
+    if data['processed_articles']['articles']:
+        post_articles(data['processed_articles'])
     else:
         LOGGER.warning('None of the articles had sentiments!')
 
-    for art in without_sentiments:
-        LOGGER.debug('article had no sentiments: %s', art)
+    for article in data['without_sentiments']:
+        LOGGER.debug('article had no sentiments: %s', article)
 
-
-# def recvall(connection: socket.socket, chunksize: int, json=False) -> bytes:
-#     data = b''
-#     while True:
-#         recv_data = connection.recv(chunksize)
-#         if not recv_data:
-#             break
-#         data += recv_data
-#     return data
 
 def add_length_header(data: bytes) -> bytes:
     '''add header indicating message length'''
@@ -144,41 +146,42 @@ def get_data(conn: socket.socket, length: int, chunksize: int = 4096) -> bytes:
 def handle_connection(connection: socket.socket):
     '''communicate with a scraper'''
     while True:
-        data = b''
-        resp = b'MSG'
+        received_filename = b''
+        response = b'MSG'
         try:
             length = consume_length_header(connection)
-            data = get_data(connection, length, 4096)
+            received_filename = get_data(connection, length, 4096)
         except ValueError as ex:
-            resp += '-EHEADER'
+            response += '-EHEADER'
             LOGGER.exception('Bad value, likely length header %s', ex)
         except (ConnectionError, OSError) as err:
-            resp += b'-ERECV'
+            response += b'-ERECV'
             LOGGER.exception('recv error: %s', err)
         else:
             try:
-                with open(data, 'r') as istream:
-                    process_articles(json.load(istream))
-                resp += b'-OK'
+                with open(received_filename, 'r') as istream:
+                    received_filename = process_articles(json.load(istream))
+                    handle_processed_articles(received_filename)
+                response += b'-OK'
             except json.JSONDecodeError:
-                resp += b'-EJSON'
+                response += b'-EJSON'
                 LOGGER.warning('Bad JSON')
             except FileNotFoundError:
-                resp += b'-EFILE'
-                LOGGER.error('No such file: %s', data.decode())
+                response += b'-EFILE'
+                LOGGER.error('No such file: %s', received_filename.decode())
             except PermissionError:
-                resp += b'-EPERM'
-                LOGGER.error('Permission denied: %s', data.decode())
+                response += b'-EPERM'
+                LOGGER.error('Permission denied: %s', received_filename.decode())
             except (ConnectionError, OSError) as err:
-                resp += b'-EUNKNOWN'
+                response += b'-EUNKNOWN'
                 LOGGER.error('Error: %s', err)
 
-        resp += b'-DONE'
-        connection.sendall(add_length_header(resp))
+        response += b'-DONE'
+        connection.sendall(add_length_header(response))
         retry = connection.recv(4)
 
         if not retry:
-            LOGGER.warning('Client closed unexpectedly. data=\n%s', data)
+            LOGGER.warning('Client closed unexpectedly. data=\n%s', received_filename)
         elif retry == b'DONE':
             LOGGER.debug('Client done sending messages.')
         elif retry in {b'NEXT', b'REDO'}:
@@ -199,12 +202,12 @@ def main():
         if os.path.exists(server_address):
             raise
 
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-        sock.bind(server_address)
-        sock.listen(1)
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
+        server.bind(server_address)
+        server.listen(1)
 
         while True:
-            connection, client_address = sock.accept()
+            connection, client_address = server.accept()
             LOGGER.debug("accepted connection from %s", client_address)
             handle_connection(connection)
 

@@ -8,7 +8,6 @@ import socket
 import sys
 import tempfile
 from scraping import API_CLIENTS, SOCKET_PATH
-from scraping.filters import CONTENT_FILTERS
 
 
 def accept_status(status: bytes) -> bool:
@@ -29,16 +28,6 @@ def accept_status(status: bytes) -> bool:
         print(f'Problematic response {status}', file=sys.stderr)
 
     return False
-
-
-# def recvall(connection: socket.socket, chunksize: int) -> bytes:
-#     data = b''
-#     while True:
-#         recv_data = connection.recv(chunksize)
-#         if not recv_data:
-#             break
-#         data += recv_data
-#     return data
 
 
 def add_length_header(data: bytes) -> bytes:
@@ -75,14 +64,6 @@ def main():
                 except OSError:
                     pass
 
-                # send_json = b''
-                # try:
-                #     send_json = json.dumps(articles).encode()
-                # except json.JSONDecodeError:
-                #     print(f'Got bad json from {client.name}\n{send_json}',
-                #           file=sys.stderr)
-                #     continue
-                # send_data = add_length_header(send_json)
                 send_data = add_length_header(filename)
 
                 retries = 3
@@ -97,12 +78,15 @@ def main():
                 if retries == 0:
                     print(f'Max retries reached: data={filename}',
                           file=sys.stderr)
+
                 if i < len(API_CLIENTS) - 1:
                     sock.sendall(b'NEXT')
+
                 try:
                     os.remove(filename)
                 except OSError:
                     pass
+
         sock.sendall(b'DONE')
 
 
