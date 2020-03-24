@@ -36,7 +36,7 @@ TARGETS_FILE=deploy.hosts
 # Create a temporary working directory and remove it upon exit
 WORKDIR=$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")
 trap 'rm -rf -- "${WORKDIR}"' EXIT
- 
+
 # Chdir into the temporary directory
 cd -- "${WORKDIR}"
 
@@ -164,12 +164,12 @@ revert()
 } << EOF
 if cd /data/releases
 then
-  if IFS='' read -r -d '' 
+  if IFS='' read -r -d ''
   then
     rm -fr -- "\${REPLY}" "\${REPLY}.tar.gz"
   fi < <(find -H . -maxdepth 2 -samefile ../current/AUTHORS -printf '%h\\0')
 
-  if IFS='' read -r -d '' 
+  if IFS='' read -r -d ''
   then
     tar -xzf "\${REPLY}"
     if cd /data/current
@@ -199,7 +199,7 @@ EOF
 apply()
 {
   local func="$1"
-  local pids=() 
+  local pids=()
   local host=0
   local rval=0
   shift
