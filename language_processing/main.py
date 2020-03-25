@@ -107,13 +107,19 @@ def handle_processed_articles(data):
     Warn about articles that were'nt tagged with sentiments or if no articles
     will be posted.
     """
-    if data['processed_articles']['articles']:
-        post_articles(data['processed_articles'])
-    else:
-        LOGGER.warning('None of the articles had sentiments!')
+    try:
+        if data['processed'].get('articles'):
+            post_articles(data['processed'])
+        else:
+            LOGGER.warning('None of the articles had sentiments!')
+    except KeyError:
+        LOGGER.warning('Data has no key "processed"')
 
-    for article in data['without_sentiments']:
-        LOGGER.debug('article had no sentiments: %s', article)
+    try:
+        for article in data['without_sentiments']:
+            LOGGER.debug('article had no sentiments: %s', article)
+    except KeyError:
+        LOGGER.info('Data has no key "without_sentiments"')
 
 
 def add_length_header(data: bytes) -> bytes:
