@@ -26,6 +26,7 @@ class ArticleSentimentTag(models.Model):
     sentiment = models.ForeignKey(Sentiment, on_delete=models.CASCADE)
     magnitude = models.FloatField()
 
+    # pylint: disable=no-member
     def __str__(self):
         return (f"A{self.corpus.id}-{self.sentiment.name}"
                 f"-{self.magnitude} ({self.id})")
@@ -33,15 +34,17 @@ class ArticleSentimentTag(models.Model):
 
 class Article(models.Model):
     """Representation of an article"""
-    url = models.URLField(max_length=254)
-    title = models.CharField(default='Article Title', max_length=254)
-    author = models.CharField(max_length=254)
+    url = models.URLField(max_length=254, unique=True)
+    title = models.CharField(default='(untitled)', max_length=254)
+    author = models.CharField(max_length=254,  default='(unknown)')
     created_at = models.DateTimeField(default=None)
     picture_url = models.URLField(blank=True)
     sentiments = models.ManyToManyField(Sentiment, through=ArticleSentimentTag)
 
+    # pylint: disable=no-member
     def __str__(self):
-        return f"{self.title[:12]}... ({self.id})"
+        """Get a string containing the title and URL of an article"""
+        return f"{str(self.title)[:12]}... ({self.id})"
 
 
 class CommentSentimentTag(models.Model):
