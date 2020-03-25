@@ -166,8 +166,8 @@ def handle_connection(connection: socket.socket):
         else:
             try:
                 with open(received_filename, 'r') as istream:
-                    received_filename = process_articles(json.load(istream))
-                    handle_processed_articles(received_filename)
+                    processed_articles = process_articles(json.load(istream))
+                    handle_processed_articles(processed_articles)
                 response += b'-OK'
             except json.JSONDecodeError:
                 response += b'-EJSON'
