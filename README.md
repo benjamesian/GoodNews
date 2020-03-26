@@ -33,7 +33,7 @@ First off, you'll neeed to clone this repository:
 
 ```git clone https://github.com/benjamesian/GoodNews.git```
 
-Request API keys from [IBM](https://www.ibm.com/cloud/watson-natural-language-understanding) and [The Guardian](https://open-platform.theguardian.com/access/), then contact one of the [authors](#authors) for details on how to proceed. Sorry, but it's the best we can do right now.
+You'll also need API keys from [IBM](https://www.ibm.com/cloud/watson-natural-language-understanding) and [The Guardian](https://open-platform.theguardian.com/access/), so request those, and then contact one of the [authors](#authors) for details on how to proceed. Sorry, but it's the best we can do right now.
 
 ## How to Contribute
 
