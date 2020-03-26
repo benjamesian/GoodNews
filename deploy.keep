@@ -1,0 +1,4 @@
+/backend/db.sqlite3
+/backend/news/migrations/
+/scraping/theguardian/data.json
+/www/static/

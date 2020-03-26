@@ -37,5 +37,4 @@ exec {'enable':
   command => 'ufw enable',
   path    => '/usr/sbin:/usr/bin:/sbin:/bin',
   require => [Exec['ssh'], Exec['http'], Exec['https'], Exec['django']],
-  notify  => Service['ufw.service'],
 }

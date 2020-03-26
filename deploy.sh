@@ -2,21 +2,21 @@
 # Deploy snapshots of the GoodNews project
 #
 # For each server:
-# 1. Create a local archive of the repo.
-# 2. Create required directories on each target.
-# 3. Upload a copy of the archive to each target.
-# 4. Extract the repo & copy in the existing DB.
-# 5. Archive the existing version and replace it.
-# 6. Apply configuration from puppet manifests.
-# 7. Delete all but the 50 most recent archives.
-# 8. Remove local temporary files and exit.
+# 1. (local)  Make an archive of the current repository.
+# 2. (remote) Create necessary directories on each target.
+# 3. (local)  Upload a copy of the archive to each target.
+# 4. (remote) Extract the repo & copy in persistent files.
+# 5. (remote) Archive the existing version and replace it.
+# 6. (remote) Apply puppet manifests.
+# 7. (remote) Remove old archives.
+# 8. (local)  Remove temporary files and exit.
 ########################################################
 
 # Enable debugging output if `DEBUG' is defined
 if [[ -v DEBUG ]]
 then
   exec {BASH_XTRACEFD}>&2
-  set -o verbose -o xtrace
+  set -o xtrace
 fi
 
 # Initialize environment (exit upon unhandled errors)
@@ -24,13 +24,14 @@ set -o errexit
 
 # Define program name and available commands
 PROGRAM=${BASH_SOURCE[0]##*/}
-ACTIONS=('prepare' 'clean' 'revert')
+ACTIONS=('clean' 'revert')
 
 # Construct paths to project files
 PROJECT=$(CDPATH='' cd -- "${BASH_SOURCE[0]%/*}" && pwd -P)
 RELEASE=${PROJECT##*/}-$(date --utc '+%Y%m%d%H%M%S')
 LOGFILE=${PROJECT}/deploy.log
 EXCLUDE_FILE=.gitignore
+PERSIST_FILE=deploy.keep
 TARGETS_FILE=deploy.hosts
 
 # Create a temporary working directory and remove it upon exit
@@ -48,49 +49,40 @@ set +o errexit
 # usage: usage
 usage()
 {
-  printf 'usage: %q [prepare|install|clean|revert]\n' "${PROGRAM}"
+  local IFS='|'
+  printf 'usage: %q %s\n' "${PROGRAM}" "[${ACTIONS[*]}]"
 }
 
 
-# Makes a local archive of a upload
+# Makes a local archive of in the temporary working directory
 # usage: archive
 archive()
 {
   local -
   set -o verbose
-  {
-    rsync -a --exclude-from="${PROJECT}/${EXCLUDE_FILE}" -- "${PROJECT}/" "${RELEASE}"
-  } && {
-    tar -xzf - -C "${RELEASE}"
-  } < <(
-    gpg --decrypt "${RELEASE}/credentials.tar.gz.gpg"
-  ) && {
+  rsync --archive --exclude-from="${PROJECT}/${EXCLUDE_FILE}" -- \
+    "${PROJECT}/" "${RELEASE}" && {
+    wait "$!"                  &&
+    tar -xzf - -C "${RELEASE}" &&
     tar -czf "${RELEASE}.tar.gz" -- "${RELEASE}"
-  }
+  } < <(gpg --decrypt "${RELEASE}/credentials.tar.gz.gpg")
 }
 
 
-# Prepares a host to recieve a release
+# Prepares a host and uploads a release
 # usage: prepare HOST
-prepare()
+upload()
 {
   tee >(cat >&2) | ssh -T -- "ubuntu@$1"
+  local -
+  set -o verbose
+  scp -v -- "${RELEASE}.tar.gz" "ubuntu@$1:/data/releases/"
 } << EOF
 sudo --non-interactive mkdir -pm 0755 /data
 sudo --non-interactive mkdir -pm 0755 /data/releases
 sudo --non-interactive chown -hR ubuntu:ubuntu /data
 exit
 EOF
-
-
-# Uploads an archived release to a host
-# usage: upload HOST
-upload()
-{
-  local -
-  set -o verbose
-  scp -- "${RELEASE}.tar.gz" "ubuntu@$1:/data/releases/"
-}
 
 
 # Installs the most recently uploaded release on host
@@ -102,21 +94,22 @@ install()
 if cd /data/releases
 then
   tar -xzf '${RELEASE//\'/\'\\\'\'}.tar.gz'
-  if IFS='' read -r -d ''
-  then
-    ( cd -- '${RELEASE//\'/\'\\\'\'}' &&
-      rsync -auv --include-from='${EXCLUDE_FILE//\'/\'\\\'\'}' ../"\${REPLY}/" ./
-    )
-    tar -czf "\${REPLY}.backup.tar.gz" -- "\${REPLY}"
-  fi < <(find -H . -maxdepth 2 -samefile ../current/AUTHORS -printf '%h\\0')
+  find -H . -maxdepth 2 -samefile ../current/AUTHORS -printf '%h\\0' |
+    if IFS='' read -r -d ''
+    then
+      tar -czf "\${REPLY}.backup.tar.gz" -- "\${REPLY}"
+      cd -- '${RELEASE//\'/\'\\\'\'}' &&
+        rsync --archive --recursive --update --verbose \
+          --files-from='${PERSIST_FILE//\'/\'\\\'\'}'  \
+          ../"\${REPLY}/" ./
+    fi
   sudo --non-interactive chown -R ubuntu:ubuntu -- '${RELEASE//\'/\'\\\'\'}'
-  if cd /data/current
-  then
+  cd /data/current && {
     rm -fr -- * .[^.]* ..?*
     ln -sv '../releases/${RELEASE//\'/\'\\\'\'}'/* ./
+  } &&
     printf '%s\\0' manifests/*.pp |
       xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
-  fi
 fi
 exit
 EOF
@@ -130,29 +123,19 @@ clean()
 } << EOF
 if cd /data/releases
 then
-  {
-    find . -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\\t%p\\0'
-  } | {
-    sort --numeric-sort --zero-terminated
-  } | {
-    head --lines=-50 --zero-terminated
-  } | {
-    cut --fields=2- --zero-terminated
-  } | {
+  find . -maxdepth 1 -type f -name '*.tar.gz' -printf '%Ts\\t%p\\0' |
+    sort --numeric-sort --zero-terminated                           |
+    head --lines=-50 --zero-terminated                              |
+    cut --fields=2- --zero-terminated                               |
+    xargs --max-args=1 --max-procs=0 --null --verbose rm -f --
+
+  find . -mindepth 1 -maxdepth 1 -type d -printf '%Ts\\t%p\\0' |
+    sort --numeric-sort --zero-terminated                      |
+    head --lines=-1 --zero-terminated                          |
+    cut --fields=2- --zero-terminated                          |
     xargs --max-args=1 --max-procs=0 --null --verbose rm -fr --
-  }
-  {
-    find . -maxdepth 1 -type d -name 'GoodNews-*' -printf '%Ts\\t%p\\0'
-  } | {
-    sort --numeric-sort --zero-terminated
-  } | {
-    head --lines=-1 --zero-terminated
-  } | {
-    cut --fields=2- --zero-terminated
-  } | {
-    xargs --max-args=1 --max-procs=0 --null --verbose rm -fr --
-  }
 fi
+exit
 EOF
 
 
@@ -164,32 +147,26 @@ revert()
 } << EOF
 if cd /data/releases
 then
-  if IFS='' read -r -d ''
-  then
-    rm -fr -- "\${REPLY}" "\${REPLY}.tar.gz"
-  fi < <(find -H . -maxdepth 2 -samefile ../current/AUTHORS -printf '%h\\0')
-
-  if IFS='' read -r -d ''
-  then
-    tar -xzf "\${REPLY}"
-    if cd /data/current
+  find -H . -maxdepth 2 -samefile ../current/AUTHORS -printf '%h\\0' |
+    if IFS='' read -r -d ''
     then
-      rm -fr -- * .[^.]* ..?*
-      ln -sv "../releases/\${REPLY%.backup.tar.gz}"/* ./
-      printf '%s\\0' manifests/*.pp |
-        xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
+      rm -fr -- "\${REPLY}" "\${REPLY}.tar.gz" "\${REPLY}.backup.tar.gz"
     fi
-  fi < <(
-    {
-      find . -maxdepth 1 -type f -name '*.backup.tar.gz' -printf '%Ts\\t%p\\0'
-    } | {
-      sort --numeric-sort --reverse --zero-terminated
-    } | {
-      head --lines=1 --zero-terminated
-    } | {
-      cut --fields=2- --zero-terminated
-    }
-  )
+
+  find . -maxdepth 1 -type f -name '*.backup.tar.gz' -printf '%Ts\\t%p\\0' |
+    sort --numeric-sort --zero-terminated --reverse                        |
+    head --lines=1 --zero-terminated                                       |
+    cut --fields=2- --zero-terminated                                      |
+    if IFS='' read -r -d ''
+    then
+      tar -xzf "\${REPLY}"
+      cd /data/current && {
+        rm -fr -- * .[^.]* ..?*
+        ln -sv "../releases/\${REPLY%.backup.tar.gz}"/* ./
+      } &&
+        printf '%s\\0' manifests/*.pp |
+          xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
+    fi
 fi
 EOF
 
@@ -254,10 +231,10 @@ shift "$((OPTIND - 1))"
 #
 if (( $#  > 1 ))
 then
-  printf '%s: too many arguments\n' "${PROGRAM}"
-  usage
+  printf >&2'%s: too many arguments\n' "${PROGRAM}"
+  usage >&2
   exit 2
-fi >&2
+fi
 
 
 # Read targets from a file or, if no such file exists, stdin
@@ -267,7 +244,7 @@ then
   IFS=$' \t\n' mapfile -t TARGETS
   printf '%s\n' 'Targets loaded:' "${TARGETS[@]}"
 else
-  printf >&2 'Failed to load targets\n'
+  printf >&2 'Failed to load targets.\n'
   exit 2
 fi < <(
   if sed 2> /dev/null '/^[ \t]*\(#\|$\)/d' "${PROJECT}/${TARGETS_FILE}"
@@ -353,12 +330,6 @@ else
   then
     printf >&2 '%q: Failed to create an arhive.\n' "${PROGRAM}"
     exit 1
-  fi
-  echo
-  echo 'Preparing...'
-  if ! apply prepare "${TARGETS[@]}"
-  then
-    printf >&2 '%q: Error occurred while preparing a target.\n' "${PROGRAM}"
   fi
   echo
   echo 'Uploading...'
