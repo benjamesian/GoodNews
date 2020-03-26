@@ -27,7 +27,11 @@ We would like to separate our frontend from our backend by using our backend web
 
 ## How to Deploy
 
-Clone this repository. Request API keys from [IBM](https://www.ibm.com/cloud/watson-natural-language-understanding) and [The Guardian](https://open-platform.theguardian.com/access/). Either remove [deploy.hosts](deploy.hosts) or update the contents with your own servers.
+First off, you'll neeed to clone this repository:
+
+```git clone https://github.com/benjamesian/GoodNews.git```
+
+Request API keys from [IBM](https://www.ibm.com/cloud/watson-natural-language-understanding) and [The Guardian](https://open-platform.theguardian.com/access/), then contact one of the [authors](#authors) for details on how to proceed. Sorry, but it's the best we can do right now.
 
 ## How to Contribute
 
