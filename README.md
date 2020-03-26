@@ -1,10 +1,12 @@
 # Good News
 
-## Stay Informed from a Different Perspective
+## Current Events from a Different Perspective
 
-Good News is a positive-news aggregation platform that attempts to address the subjective nature of "positivity" and "negativity". Currently the site scrapes articles from The Guardian and uses the IBM Tone Analyzer to tag each articles with sentiments. Our [index page](https://www.thefunk.tech/) shows all articles that have not been tagged with _fear_, _anger_, or _sadness_. By selecting from the dropdown menu in the navbar at the top of the page, you are able to filter content based on sentiment. For example, if you were to select the sentiment _joy_, then only articles tagged as expressing _joy_ will be displayed.
+Good News is a positive-news aggregation platform that attempts to provide an alternative perspective on current events through by providing a stage for the light to shine through, simultaneously exploring the subjective nature of *positivity*. Good News collects articles from The Guardian and submits the content to IBM's Tone Analyzer. For each article, IBM sends back tags that each contain the name of an emotion present in the piece and a value describing how strongly that emotion is expressed.
 
-![GoodNews](GoodNews_sample.png)
+The site's [index page](https://www.thefunk.tech/) shows articles that have **not** been tagged with _fear_, _anger_, or _sadness_. By selecting from the dropdown menu in the navbar at the top of the page, you have the option to filter content based on sentiment. For example, if you were to select the sentiment _joy_, then only articles tagged as conveying _joy_ will be displayed.
+
+![Good News index page](GoodNews_sample.png)
 
 ## Notable Features
 
@@ -39,17 +41,8 @@ Feedback, ideas, contributions, questions, criticisms and conversations are alwa
 
 ## Authors
 
-- _[Ben Cook](https://github.com/benjamesian/)_ - <bencook400@gmail.com>
-  - Twitter: [@benjamesian](https://twitter.com/benjamesian)
-  - LinkedIn: [jamesbencook](https://www.linkedin.com/in/jamesbencook)
-- _[Patrick DeYoreo](https://github.com/patrickdeyoreo/)_ - <pdeyoreo@gmail.com>
-  - Twitter: [@deyoreopatrick](https://twitter.com/deyoreopatrick)
-  - LinkedIn: [patrickdeyoreo](https://www.linkedin.com/in/patrickdeyoreo)
-
-
-#### Social Media
-
-- [LinkedIn](https://www.linkedin.com/in/patrickdeyoreo/)
+- **[Ben Cook](https://github.com/benjamesian)** - <bencook400@gmail.com> [[LinkedIn](https://www.linkedin.com/in/jamesbencook)]
+- **[Patrick DeYoreo](https://github.com/patrickdeyoreo/)** - <pdeyoreo@gmail.com> [[LinkedIn](https://www.linkedin.com/in/patrickdeyoreo)]
 
 ## [License](LICENSE)
 
@@ -57,6 +50,7 @@ Distributed under the MIT License.
 
 Copyright (c) 2020 Patrick DeYoreo & James Cook
 
-## Related Works
+## Related Resources
 
-- [How my attempt at building a news aggregation platform resulted in a COVID-19 filter for The Guardian.](https://medium.com/patricks-blog-for-holberton-school/good-news-everyone-cd6ab7387d6a)
+- [GoodNews](https://www.thefunk.tech/)
+- [How my attempt at building a news aggregation platform resulted in a COVID-19 filter for The Guardian](https://medium.com/patricks-blog-for-holberton-school/good-news-everyone-cd6ab7387d6a)
