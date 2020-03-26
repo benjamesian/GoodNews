@@ -25,4 +25,9 @@ We would like to separate our frontend from our backend by using our backend web
 
 ## Contact & Contributing
 
-Ideas, contributions, and discussion in general is always welcome. If you would like to get in touch or become involved in this project reach out to Ben at bencook400@gmail.com .
+Ideas, contributions, and discussion in general is always welcome. If you would like to get in touch or become involved in this project reach out to Ben at bencook400@gmail.com.
+
+
+## License
+This project is distributed under the MIT License. See [/LICENSE](LICENSE) for more information.
+
