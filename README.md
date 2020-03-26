@@ -29,5 +29,5 @@ Ideas, contributions, and discussion in general is always welcome. If you would 
 
 
 ## License
-This project is distributed under the MIT License. See [/LICENSE](LICENSE) for more information.
+This project is distributed under the MIT License. See [license](/LICENSE) for more information.
 
