@@ -38,8 +38,18 @@ Request API keys from [IBM](https://www.ibm.com/cloud/watson-natural-language-un
 Feedback, ideas, contributions, questions, criticisms and conversations are always welcome. If the service described here seems valuable to you and you want to get involved, feel free to reach out to one of the [authors](#authors).
 
 ## Authors
-- [Ben Cook](https://github.com/benjamesian/) - bencook400@gmail.com
-- [Patrick DeYoreo](https://github.com/patrickdeyoreo/) - bencook400@gmail.com
+
+- _[Ben Cook](https://github.com/benjamesian/)_ - <bencook400@gmail.com>
+  - Twitter: [@benjamesian](https://twitter.com/benjamesian)
+  - LinkedIn: [jamesbencook](https://www.linkedin.com/in/jamesbencook)
+- _[Patrick DeYoreo](https://github.com/patrickdeyoreo/)_ - <pdeyoreo@gmail.com>
+  - Twitter: [@deyoreopatrick](https://twitter.com/deyoreopatrick)
+  - LinkedIn: [patrickdeyoreo](https://www.linkedin.com/in/patrickdeyoreo)
+
+
+#### Social Media
+
+- [LinkedIn](https://www.linkedin.com/in/patrickdeyoreo/)
 
 ## [License](LICENSE)
 
