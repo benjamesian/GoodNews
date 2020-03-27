@@ -19,7 +19,7 @@ The site's [index page](https://www.thefunk.tech/) shows articles that have **no
 
 So far we have done nothing to address the subjectivity surrounding what is *good*. We would like to address this in the following ways:
 
-- investigate switching from IBM Tone Analyzer to an open source sentiment analysis tool in hopes of being able to fine tune models for our purposes
+- Investigate switching from IBM Tone Analyzer to an open source sentiment analysis tool in hopes of being able to fine tune models for our purposes
 - Allow site users to make accounts. Users will be able to like and comment on articles. Likes will be used to customize user feed and hopefully show them the content they are most likely to enjoy. Comments will be run thru sentiment analysis in hopes of understanding how our users react to articles with specific tag combos.
 - allow users to ban specific keywords or topics that may occur in articles so such articles do not appear in their feed.
 
@@ -37,7 +37,7 @@ You'll also need API keys from [IBM](https://www.ibm.com/cloud/watson-natural-la
 
 ## How to Contribute
 
-Feedback, ideas, contributions, questions, criticisms and conversations are always welcome. If the service described here seems valuable to you and you want to get involved, feel free to reach out to one of the [authors](#authors).
+Feedback, ideas, contributions, questions, criticisms and conversations are always welcome. If the service described here seems valuable to you and you want to get involved, feel free to reach out to one of the authors.
 
 ## Authors
 
@@ -53,4 +53,4 @@ Copyright (c) 2020 Patrick DeYoreo & James Cook
 ## Related Resources
 
 - [GoodNews](https://www.thefunk.tech/)
-- [How my attempt at building a news aggregation platform resulted in a COVID-19 filter for The Guardian](https://medium.com/patricks-blog-for-holberton-school/good-news-everyone-cd6ab7387d6a)
+- [How an attempt to build a news aggregation platform yielded a COVID-19 filter for The Guardian](https://medium.com/patricks-blog-for-holberton-school/good-news-everyone-cd6ab7387d6a)
