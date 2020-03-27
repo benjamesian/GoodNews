@@ -6,7 +6,7 @@ Good News is a positive-news aggregation platform that attempts to provide an al
 
 The site's [index page](https://www.thefunk.tech/) shows articles that have **not** been tagged with _fear_, _anger_, or _sadness_. By selecting from the dropdown menu in the navbar at the top of the page, you have the option to filter content based on sentiment. For example, if you were to select the sentiment _joy_, then only articles tagged as conveying _joy_ will be displayed.
 
-![Good News index page](GoodNews_sample.png)
+[![Good News index page](GoodNews_sample.png)](https://www.thefunk.tech/)
 
 ## Notable Features
 
