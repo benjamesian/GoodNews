@@ -53,4 +53,4 @@ Copyright (c) 2020 Patrick DeYoreo & James Cook
 ## Related Resources
 
 - [GoodNews](https://www.thefunk.tech/)
-- [How an attempt to build a news aggregation platform yielded a COVID-19 filter for The Guardian](https://medium.com/patricks-blog-for-holberton-school/good-news-everyone-cd6ab7387d6a)
+- [My Attempt at Building a News Aggregation Platform](https://medium.com/patricks-blog-for-holberton-school/good-news-everyone-cd6ab7387d6a)
