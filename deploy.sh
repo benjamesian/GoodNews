@@ -35,7 +35,7 @@ PERSIST_FILE=deploy.keep
 TARGETS_FILE=deploy.hosts
 
 # Create a temporary working directory and remove it upon exit
-WORKDIR=$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")
+WORKDIR=$(mktemp --directory --tmpdir -- "${BASH_SOURCE[0]##*/}-XXXXX")
 trap 'rm -rf -- "${WORKDIR}"' EXIT
 
 # Chdir into the temporary directory
@@ -78,9 +78,9 @@ upload()
   set -o verbose
   scp -v -- "${RELEASE}.tar.gz" "ubuntu@$1:/data/releases/"
 } << EOF
-sudo --non-interactive mkdir -pm 0755 /data
-sudo --non-interactive mkdir -pm 0755 /data/releases
-sudo --non-interactive chown -hR ubuntu:ubuntu /data
+sudo --non-interactive --set-home mkdir -pm 0755 /data
+sudo --non-interactive --set-home mkdir -pm 0755 /data/releases
+sudo --non-interactive --set-home chown -hR ubuntu:ubuntu /data
 exit
 EOF
 
@@ -103,13 +103,13 @@ then
           --files-from='${PERSIST_FILE//\'/\'\\\'\'}'  \
           ../"\${REPLY}/" ./
     fi
-  sudo --non-interactive chown -R ubuntu:ubuntu -- '${RELEASE//\'/\'\\\'\'}'
+  sudo --non-interactive --set-home chown -R ubuntu:ubuntu -- '${RELEASE//\'/\'\\\'\'}'
   cd /data/current && {
     rm -fr -- * .[^.]* ..?*
     ln -sv '../releases/${RELEASE//\'/\'\\\'\'}'/* ./
   } &&
     printf '%s\\0' manifests/*.pp |
-      xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
+      xargs --max-args=1 --null --verbose sudo --non-interactive --set-home puppet apply
 fi
 exit
 EOF
@@ -165,7 +165,7 @@ then
         ln -sv "../releases/\${REPLY%.backup.tar.gz}"/* ./
       } &&
         printf '%s\\0' manifests/*.pp |
-          xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
+          xargs --max-args=1 --null --verbose sudo --non-interactive --set-home puppet apply
     fi
 fi
 EOF
@@ -266,9 +266,7 @@ fi < <(
   then
     exit 1
   fi
-  tput bold
-  printf 'Hosts: (press Ctrl-D when done)'
-  tput sgr0
+  printf 'Hosts: (Press Ctrl-D when done)'
   echo
   if wait "$!"
   then
