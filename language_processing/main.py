@@ -158,7 +158,7 @@ def handle_connection(connection: socket.socket):
             length = consume_length_header(connection)
             received_filename = get_data(connection, length, 4096)
         except ValueError as ex:
-            response += '-EHEADER'
+            response += b'-EHEADER'
             LOGGER.exception('Bad value, likely length header %s', ex)
         except (ConnectionError, OSError) as err:
             response += b'-ERECV'
