@@ -348,8 +348,6 @@ else
     printf >&2 '%q: Error occurred while cleaning a target.\n' "${PROGRAM}"
   fi
   echo
-fi {stdout}>&1 1> >(
-  tee -a "${LOGFILE}" >&"${stdout}"
-) {stderr}>&2 2> >(
-  tee -a "${LOGFILE}" >&"${stderr}"
-)
+fi {stdout}>&1 {stderr}>&2 \
+  1> >(tee -a "${LOGFILE}" >&"${stdout}") \
+  2> >(tee -a "${LOGFILE}" >&"${stderr}")
