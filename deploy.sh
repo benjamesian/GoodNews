@@ -201,6 +201,58 @@ apply()
 }
 
 
+# Gets target hosts from file or stdin if file does not exist
+# usage: targets FILE
+targets()
+{
+  if sed 2> /dev/null '/^[ \t]*\(#\|$\)/d' "$1"
+  then
+    printf 1>&2 'Hosts read from %s\n' "$1"
+    exit 0
+  fi
+  exec {stdout}>&1 1>&2
+  printf 'Unable to read hosts from %s\n' "$1"
+  if [[ ! -t 1 ]]
+  then
+    exit 1
+  fi
+  printf 'Either ensure the file exists or specify targets now.\n'
+  read -r -N 1 -p 'Would you like to specify a list of target hosts? [Y/n] '
+  echo
+  if [[ ${REPLY,} != y ]]
+  then
+    exit 1
+  fi
+  echo 'Hosts: (Press Ctrl-D when done)'
+  if wait "$!"
+  then
+    IFS=$' \t\n' mapfile -t TARGETS
+  else
+    echo 'Whoops! an unexpected error occurred.'
+    exit 1
+  fi < <(
+    sed 2> /dev/null '/^[ \t\n]*\(#\|$\)/d'
+  )
+  trap 'printf >&"${stdout}" "%s\\n" "${TARGETS[@]}"' EXIT
+  read -r -N 1 -p 'Would you like to save this list? [Y/n] '
+  echo
+  if [[ ${REPLY,} != y ]]
+  then
+    exit 1
+  fi
+  if [[ -e $1 ]]
+  then
+    read -r -N 1 -p "Overwrite $1? [Y/n] "
+    echo
+  fi
+  if [[ ${REPLY,} != y ]]
+  then
+    exit 1
+  fi
+  printf 'Writing hosts to file %q...\n' "$1"
+  printf > "$1" '%s\n' "${TARGETS[@]}"
+}
+
 # Parse command options
 #
 OPTIND=1
@@ -247,52 +299,7 @@ else
   printf >&2 'Failed to load targets.\n'
   exit 2
 fi < <(
-  if sed 2> /dev/null '/^[ \t]*\(#\|$\)/d' "${PROJECT}/${TARGETS_FILE}"
-  then
-    printf >&2 'Hosts read from %s\n' "${PROJECT}/${TARGETS_FILE}"
-    exit 0
-  fi
-  exec {stdout}>&1
-  exec 1>&2
-  printf 'Unable to read hosts from %s\n' "${PROJECT}/${TARGETS_FILE}"
-  if [[ ! -t 1 ]]
-  then
-    exit 1
-  fi
-  printf 'Either ensure the file exists or specify targets now.\n'
-  read -r -N 1 -p 'Would you like to specify a list of target hosts? [Y/n] '
-  echo
-  if [[ ${REPLY,} != y ]]
-  then
-    exit 1
-  fi
-  printf 'Hosts: (Press Ctrl-D when done)'
-  echo
-  if wait "$!"
-  then
-    IFS=$' \t\n' mapfile -t TARGETS
-  else
-    printf 'Whoops, an unexpected error occurred\n'
-    exit 1
-  fi < <(sed 2> /dev/null '/^[ \t\n]*\(#\|$\)/d')
-  trap 'printf "%s\\n" "${TARGETS[@]}" >&"${stdout}"' EXIT
-  read -r -N 1 -p 'Would you like to save this list? [Y/n] '
-  echo
-  if [[ ${REPLY,} != y ]]
-  then
-    exit 1
-  fi
-  if [[ -e ${PROJECT}/${TARGETS_FILE} ]]
-  then
-    read -r -N 1 -p "Overwrite ${PROJECT}/${TARGETS_FILE}? [Y/n] "
-  fi
-  echo
-  if [[ ${REPLY,} != y ]]
-  then
-    exit 1
-  fi
-  printf 'Writing hosts to file %q...\n' "${PROJECT}/${TARGETS_FILE}"
-  printf > "${PROJECT}/${TARGETS_FILE}" '%s\n' "${TARGETS[@]}"
+  targets "${PROJECT}/${TARGETS_FILE}"
 )
 
 
