@@ -216,7 +216,6 @@ targets()
   then
     exit 1
   fi
-  printf 'Either ensure the file exists or specify targets now.\n'
   read -r -N 1 -p 'Would you like to specify a list of target hosts? [Y/n] '
   echo
   if [[ ${REPLY,} != y ]]
@@ -249,8 +248,11 @@ targets()
   then
     exit 1
   fi
-  printf 'Writing hosts to file %q...\n' "$1"
-  printf > "$1" '%s\n' "${TARGETS[@]}"
+  if rm -f -r -- "$1"
+  then
+    printf 'Writing target hosts to file %q ...\n' "$1"
+    printf > "$1" '%s\n' "${TARGETS[@]}"
+  fi
 }
 
 # Parse command options
