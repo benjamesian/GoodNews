@@ -17,15 +17,25 @@ The site's [index page](https://www.thefunk.tech/) shows articles that have **no
 
 ## What's Missing
 
-So far we have done nothing to address the subjectivity surrounding what is *good*. We would like to address this in the following ways:
+So far we have done nothing to address the subjectivity surrounding what is
+*good*. We would like to address this in the following ways:
 
-- Investigate switching from IBM Tone Analyzer to an open source sentiment analysis tool in hopes of being able to fine tune models for our purposes
-- Allow site users to make accounts. Users will be able to like and comment on articles. Likes will be used to customize user feed and hopefully show them the content they are most likely to enjoy. Comments will be run thru sentiment analysis in hopes of understanding how our users react to articles with specific tag combos.
-- allow users to ban specific keywords or topics that may occur in articles so such articles do not appear in their feed.
+- Investigate switching from IBM Tone Analyzer to an open source sentiment
+  analysis tool in hopes of being able to fine tune models for our purposes
+- Allow site users to make accounts. Users will be able to like and comment on
+  articles. Likes will be used to customize user feed and hopefully show them the
+  content they are most likely to enjoy. Comments will be run thru sentiment
+  analysis in hopes of understanding how our users react to articles with
+  specific tag combos.
+- Allow users to ban specific keywords or topics that may occur in articles so
+  such articles do not appear in their feed.
 
 ### Long-Term Goals
 
-We would like to separate our frontend from our backend by using our backend web framework as a REST api for our db. We believe that using a tool such as React for frontend rendering will help simplify our code base, create a better looking product, and accelerate feature development.
+We would like to separate our frontend from our backend by using our backend
+web framework as a REST api for our db. We believe that using a tool such as
+React for frontend rendering will help simplify our code base, create a better
+looking product, and accelerate feature development.
 
 ## How to Deploy
 
@@ -33,16 +43,24 @@ First off, you'll neeed to clone this repository:
 
 ```git clone https://github.com/benjamesian/GoodNews.git```
 
-You'll also need API keys from [IBM](https://www.ibm.com/cloud/watson-natural-language-understanding) and [The Guardian](https://open-platform.theguardian.com/access/), so request those, and then contact one of the [authors](#authors) for details on how to proceed. Sorry, but it's the best we can do right now.
+You'll also need API keys from
+[IBM](https://www.ibm.com/cloud/watson-natural-language-understanding) and
+[The Guardian](https://open-platform.theguardian.com/access/). Request those,
+then contact one of the [authors](#authors) for details on how to proceed.
+Sorry, but it's the best we can do right now.
 
 ## How to Contribute
 
-Feedback, ideas, contributions, questions, criticisms and conversations are always welcome. If the service described here seems valuable to you and you want to get involved, feel free to reach out to one of the authors.
+Feedback, ideas, contributions, questions, criticisms and conversations are
+always welcome. If the service described here seems valuable to you and you
+want to get involved, feel free to reach out to one of the authors.
 
 ## Authors
 
-- **[Ben Cook](https://github.com/benjamesian)** - <bencook400@gmail.com> [[LinkedIn](https://www.linkedin.com/in/jamesbencook)]
-- **[Patrick DeYoreo](https://github.com/patrickdeyoreo/)** - <pdeyoreo@gmail.com> [[LinkedIn](https://www.linkedin.com/in/patrickdeyoreo)]
+- **[Ben Cook](https://github.com/benjamesian)** -
+  <bencook400@gmail.com> [[LinkedIn](https://www.linkedin.com/in/jamesbencook)]
+- **[Patrick DeYoreo](https://github.com/patrickdeyoreo/)** -
+  <pdeyoreo@gmail.com> [[LinkedIn](https://www.linkedin.com/in/patrickdeyoreo)]
 
 ## [License](LICENSE)
 
