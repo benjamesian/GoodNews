@@ -22,6 +22,9 @@ migrations/
 # virtual environments
 venv/
 
+# deployment targets
+deploy.hosts
+
 # sensitive credentials
 credentials/
 credentials.tar.gz

@@ -35,7 +35,7 @@ PERSIST_FILE=deploy.keep
 TARGETS_FILE=deploy.hosts
 
 # Create a temporary working directory and remove it upon exit
-WORKDIR=$(mktemp -d --tmpdir "${BASH_SOURCE[0]##*/}-XXXXX")
+WORKDIR=$(mktemp --directory --tmpdir -- "${BASH_SOURCE[0]##*/}-XXXXX")
 trap 'rm -rf -- "${WORKDIR}"' EXIT
 
 # Chdir into the temporary directory
@@ -78,9 +78,9 @@ upload()
   set -o verbose
   scp -v -- "${RELEASE}.tar.gz" "ubuntu@$1:/data/releases/"
 } << EOF
-sudo --non-interactive mkdir -pm 0755 /data
-sudo --non-interactive mkdir -pm 0755 /data/releases
-sudo --non-interactive chown -hR ubuntu:ubuntu /data
+sudo --non-interactive --set-home mkdir -pm 0755 /data
+sudo --non-interactive --set-home mkdir -pm 0755 /data/releases
+sudo --non-interactive --set-home chown -hR ubuntu:ubuntu /data
 exit
 EOF
 
@@ -103,13 +103,13 @@ then
           --files-from='${PERSIST_FILE//\'/\'\\\'\'}'  \
           ../"\${REPLY}/" ./
     fi
-  sudo --non-interactive chown -R ubuntu:ubuntu -- '${RELEASE//\'/\'\\\'\'}'
+  sudo --non-interactive --set-home chown -R ubuntu:ubuntu -- '${RELEASE//\'/\'\\\'\'}'
   cd /data/current && {
     rm -fr -- * .[^.]* ..?*
     ln -sv '../releases/${RELEASE//\'/\'\\\'\'}'/* ./
   } &&
     printf '%s\\0' manifests/*.pp |
-      xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
+      xargs --max-args=1 --null --verbose sudo --non-interactive --set-home puppet apply
 fi
 exit
 EOF
@@ -165,7 +165,7 @@ then
         ln -sv "../releases/\${REPLY%.backup.tar.gz}"/* ./
       } &&
         printf '%s\\0' manifests/*.pp |
-          xargs --max-args=1 --null --verbose sudo --non-interactive puppet apply
+          xargs --max-args=1 --null --verbose sudo --non-interactive --set-home puppet apply
     fi
 fi
 EOF
@@ -200,6 +200,60 @@ apply()
   return "${rval}"
 }
 
+
+# Gets target hosts from file or stdin if file does not exist
+# usage: targets FILE
+targets()
+{
+  if sed 2> /dev/null '/^[ \t]*\(#\|$\)/d' "$1"
+  then
+    printf 1>&2 'Hosts read from %s\n' "$1"
+    exit 0
+  fi
+  exec {stdout}>&1 1>&2
+  printf 'Unable to read hosts from %s\n' "$1"
+  if [[ ! -t 1 ]]
+  then
+    exit 1
+  fi
+  read -r -N 1 -p 'Would you like to specify a list of target hosts? [Y/n] '
+  echo
+  if [[ ${REPLY,} != y ]]
+  then
+    exit 1
+  fi
+  echo 'Hosts: (Press Ctrl-D when done)'
+  if wait "$!"
+  then
+    IFS=$' \t\n' mapfile -t TARGETS
+  else
+    echo 'Whoops! an unexpected error occurred.'
+    exit 1
+  fi < <(
+    sed 2> /dev/null '/^[ \t\n]*\(#\|$\)/d'
+  )
+  trap 'printf >&"${stdout}" "%s\\n" "${TARGETS[@]}"' EXIT
+  read -r -N 1 -p 'Would you like to save this list? [Y/n] '
+  echo
+  if [[ ${REPLY,} != y ]]
+  then
+    exit 1
+  fi
+  if [[ -e $1 ]]
+  then
+    read -r -N 1 -p "Overwrite $1? [Y/n] "
+    echo
+  fi
+  if [[ ${REPLY,} != y ]]
+  then
+    exit 1
+  fi
+  if rm -f -r -- "$1"
+  then
+    printf 'Writing target hosts to file %q ...\n' "$1"
+    printf > "$1" '%s\n' "${TARGETS[@]}"
+  fi
+}
 
 # Parse command options
 #
@@ -247,54 +301,7 @@ else
   printf >&2 'Failed to load targets.\n'
   exit 2
 fi < <(
-  if sed 2> /dev/null '/^[ \t]*\(#\|$\)/d' "${PROJECT}/${TARGETS_FILE}"
-  then
-    printf >&2 'Hosts read from %s\n' "${PROJECT}/${TARGETS_FILE}"
-    exit 0
-  fi
-  exec {stdout}>&1
-  exec 1>&2
-  printf 'Unable to read hosts from %s\n' "${PROJECT}/${TARGETS_FILE}"
-  if [[ ! -t 1 ]]
-  then
-    exit 1
-  fi
-  printf 'Either ensure the file exists or specify targets now.\n'
-  read -r -N 1 -p 'Would you like to specify a list of target hosts? [Y/n] '
-  echo
-  if [[ ${REPLY,} != y ]]
-  then
-    exit 1
-  fi
-  tput bold
-  printf 'Hosts: (press Ctrl-D when done)'
-  tput sgr0
-  echo
-  if wait "$!"
-  then
-    IFS=$' \t\n' mapfile -t TARGETS
-  else
-    printf 'Whoops, an unexpected error occurred\n'
-    exit 1
-  fi < <(sed 2> /dev/null '/^[ \t\n]*\(#\|$\)/d')
-  trap 'printf "%s\\n" "${TARGETS[@]}" >&"${stdout}"' EXIT
-  read -r -N 1 -p 'Would you like to save this list? [Y/n] '
-  echo
-  if [[ ${REPLY,} != y ]]
-  then
-    exit 1
-  fi
-  if [[ -e ${PROJECT}/${TARGETS_FILE} ]]
-  then
-    read -r -N 1 -p "Overwrite ${PROJECT}/${TARGETS_FILE}? [Y/n] "
-  fi
-  echo
-  if [[ ${REPLY,} != y ]]
-  then
-    exit 1
-  fi
-  printf 'Writing hosts to file %q...\n' "${PROJECT}/${TARGETS_FILE}"
-  printf > "${PROJECT}/${TARGETS_FILE}" '%s\n' "${TARGETS[@]}"
+  targets "${PROJECT}/${TARGETS_FILE}"
 )
 
 
@@ -350,8 +357,6 @@ else
     printf >&2 '%q: Error occurred while cleaning a target.\n' "${PROGRAM}"
   fi
   echo
-fi {stdout}>&1 1> >(
-  tee -a "${LOGFILE}" >&"${stdout}"
-) {stderr}>&2 2> >(
-  tee -a "${LOGFILE}" >&"${stderr}"
-)
+fi {stdout}>&1 {stderr}>&2 \
+  1> >(tee -a "${LOGFILE}" >&"${stdout}") \
+  2> >(tee -a "${LOGFILE}" >&"${stderr}")

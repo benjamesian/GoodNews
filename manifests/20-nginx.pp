@@ -8,7 +8,8 @@ package {'nginx':
 service {'nginx.service':
   ensure    => running,
   enable    => true,
-  subscribe => [File['sites-enabled'], File['sites-disabled']],
+  require   => Package['nginx'],
+  #  subscribe => [File['sites-disabled'], File['sites-enabled']],
 }
 
 file {'sites-disabled':
@@ -31,11 +32,12 @@ file {'sites-enabled':
   ensure  => link,
   path    => '/etc/nginx/sites-enabled/goodnews',
   target  => '../sites-available/goodnews',
-  require => File['sites-available'],
+  require => [File['sites-available'], File['sites-disabled']],
+  notify  => Exec['restart']
 }
 
 exec {'restart':
-  command => 'systemctl restart nginx.service',
-  path    => '/usr/bin:/bin',
-  require => [Service['nginx.service']],
+  command   => 'systemctl restart nginx.service',
+  path      => '/usr/sbin:/usr/bin:/sbin:/bin',
+  require   => Package['nginx'],
 }
